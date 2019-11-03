@@ -134,6 +134,7 @@ __attribute__ ((section(".isr_vector"))) const DeviceVectors exception_table =
   (void*) (0UL),                  /* Reserved */
 };
 
+extern int safeboot(void);
 extern int main(void);
 
 /* This is called on processor reset to initialize the device and call main() */
@@ -155,7 +156,9 @@ void Reset_Handler(void)
     for (pDest = &__bss_start__; pDest < &__bss_end__; pDest++)
       *pDest = 0;
   }
-
+  
+  safeboot();
+  
   SystemInit();
 
   main();

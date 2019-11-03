@@ -56,6 +56,7 @@ extern "C"{
 void yield( void ) ;
 
 /* system functions */
+int safeboot( void );
 int main( void );
 void init( void );
 

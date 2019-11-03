@@ -210,6 +210,7 @@
       <Value>..\include\core\samd21\include\component</Value>
       <Value>..\include\core\samd21\include\instance</Value>
       <Value>..\include\core\samd21\include\pio</Value>
+      <Value>../include</Value>
     </ListValues>
   </armgcccpp.compiler.directories.IncludePaths>
   <armgcccpp.compiler.optimization.level>Optimize for size (-Os)</armgcccpp.compiler.optimization.level>
@@ -228,6 +229,7 @@
     </ListValues>
   </armgcccpp.linker.libraries.Libraries>
   <armgcccpp.linker.optimization.GarbageCollectUnusedSections>True</armgcccpp.linker.optimization.GarbageCollectUnusedSections>
+  <armgcccpp.linker.memorysettings.ExternalRAM />
   <armgcccpp.linker.miscellaneous.LinkerFlags>-Wl,--cref -Os -Wl,--check-sections -Wl,--unresolved-symbols=report-all -Wl,--warn-common -Wl,--warn-section-align</armgcccpp.linker.miscellaneous.LinkerFlags>
   <armgcccpp.assembler.general.IncludePaths>
     <ListValues>
@@ -640,6 +642,9 @@
     <Compile Include="include\core\WVariant.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="include\DmaUartMaster.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="include\variants\pins_arduino.h">
       <SubType>compile</SubType>
     </Compile>
@@ -737,6 +742,12 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\core\WString.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\DmaUartMaster.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\safeboot.cpp">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\variants\variant.cpp">

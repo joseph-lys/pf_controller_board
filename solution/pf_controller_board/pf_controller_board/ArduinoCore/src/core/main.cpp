@@ -32,19 +32,6 @@ extern "C" void __libc_init_array(void);
  */
 int main( void )
 {
-  const int sys_pb0_pin = 8;
-  volatile int count=0;
-  pinMode(sys_pb0_pin, INPUT_PULLDOWN);
-  while(count < 50) {
-    count++;
-  }
-  count = 0;
-  while(count < 1000) {
-    if(digitalRead(sys_pb0_pin)) {
-      while(1) { count++; };  // infinite loop
-    }
-    count++;
-  }
   init();
 
   __libc_init_array();
