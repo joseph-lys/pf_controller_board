@@ -11,9 +11,10 @@
 #include "SERCOM.h"
 #include "HardwareSerial.h"
 #include "wiring_private.h"
+#include "dmashared.h"
 
-DmaUartMaster::DmaUartMaster(Sercom *_s, uint32_t _dma_channel, uint8_t _pinRX, uint8_t _pinTX, SercomRXPad _padRX, SercomUartTXPad _padTX) 
-: arduino_sercom(_s) {
+DmaUartMaster::DmaUartMaster(XSERCOM *_s, uint8_t _dma_channel, uint8_t _pinRX, uint8_t _pinTX, SercomRXPad _padRX, SercomUartTXPad _padTX) 
+: sercom(_s), tx_desc(*(Dma::firstDesc(_dma_channel))) {
     sercom = _s;
     dma_channel = _dma_channel;
     uc_pinRX = _pinRX;
@@ -89,7 +90,7 @@ void DmaUartMaster::setup_descriptors() {
   tx_desc.BTCTRL.bit.STEPSIZE = DMAC_BTCTRL_STEPSIZE_X1_Val;
   tx_desc.BTCNT.reg = 0;  // undetermined until transfer initiated
   tx_desc.SRCADDR.reg = 0;  // undetermined until transfer initiated
-  tx_desc.DSTADDR.reg = reinterpret_cast<uint32_t>(&(sercom->USART.DATA.reg));
+  tx_desc.DSTADDR.reg = reinterpret_cast<uint32_t>(&(sercom->getSercomPointer()->USART.DATA.reg));
   tx_desc.DESCADDR.reg = 0;  // undetermined until transfer initiated
 
   // Set descriptor for RX
@@ -101,7 +102,7 @@ void DmaUartMaster::setup_descriptors() {
   rx_desc.BTCTRL.bit.STEPSEL = DMAC_BTCTRL_STEPSEL_SRC_Val;
   rx_desc.BTCTRL.bit.STEPSIZE = DMAC_BTCTRL_STEPSIZE_X1_Val;
   rx_desc.BTCNT.reg = 0;  // undetermined until transfer initiated
-  rx_desc.SRCADDR.reg = reinterpret_cast<uint32_t>(&(sercom->USART.DATA.reg));
+  rx_desc.SRCADDR.reg = reinterpret_cast<uint32_t>(&(sercom->getSercomPointer()->USART.DATA.reg));
   rx_desc.DSTADDR.reg = 0;  // undetermined until transfer initiated 
   rx_desc.DESCADDR.reg = 0;  // undetermined until transfer initiated
 }
@@ -110,11 +111,11 @@ void DmaUartMaster::begin(unsigned long baudrate, uint16_t config) {
   pinPeripheral(uc_pinRX, g_APinDescription[uc_pinRX].ulPinType);
   pinPeripheral(uc_pinTX, g_APinDescription[uc_pinTX].ulPinType);
   
-  arduino_sercom.initUART(UART_INT_CLOCK, SAMPLE_RATE_x16, baudrate);
-  arduino_sercom.initFrame(extractCharSize(config), LSB_FIRST, extractParity(config), extractNbStopBit(config));
-  arduino_sercom.initPads(uc_padTX, uc_padRX);
+  sercom->initUART(UART_INT_CLOCK, SAMPLE_RATE_x16, baudrate);
+  sercom->initFrame(extractCharSize(config), LSB_FIRST, extractParity(config), extractNbStopBit(config));
+  sercom->initPads(uc_padTX, uc_padRX);
 
-  arduino_sercom.enableUART();
+  sercom->enableUART();
 }
 
 

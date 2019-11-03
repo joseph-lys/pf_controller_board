@@ -41,6 +41,8 @@
 #ifdef __cplusplus
 #include "SERCOM.h"
 #include "Uart.h"
+#include "XSERCOM.h"
+#include "DmaUartMaster.h"
 #endif // __cplusplus
 
 #ifdef __cplusplus
@@ -180,9 +182,9 @@ extern SERCOM sercom1;
 extern SERCOM sercom2;
 extern SERCOM sercom3;
 extern SERCOM sercom4;
-extern SERCOM sercom5;
+extern XSERCOM sercom5;
 
-extern Uart Serial;
+extern DmaUartMaster Serial;
 extern Uart Serial1;
 
 #endif
@@ -211,13 +213,12 @@ unsigned int PINCOUNT_fn();
 // SERIAL_PORT_HARDWARE_OPEN  Hardware serial ports which are open for use.  Their RX & TX
 //                            pins are NOT connected to anything by default.
 #define SERIAL_PORT_USBVIRTUAL      SerialUSB
-#define SERIAL_PORT_MONITOR         Serial
+#define SERIAL_PORT_MONITOR         Serial1
 // Serial has no physical pins broken out, so it's not listed as HARDWARE port
 #define SERIAL_PORT_HARDWARE        Serial1
 #define SERIAL_PORT_HARDWARE_OPEN   Serial1
 
-// Legacy way to describe serial port on pins 0-1
-#define Serial5   Serial1
+
 
 #endif /* _VARIANT_ARDUINO_ZERO_ */
 

@@ -9,7 +9,7 @@
 #ifndef DMAUARTMASTER_H_
 #define DMAUARTMASTER_H_
 
-#include "SERCOM.h"
+#include "XSERCOM.h"
 
 class DmaUartMaster {
   public:
@@ -18,7 +18,7 @@ class DmaUartMaster {
       is_done,
       is_timeout
     };
-    DmaUartMaster(Sercom *_s, uint32_t _dma_channel, uint8_t _pinRX, uint8_t _pinTX, SercomRXPad _padRX, SercomUartTXPad _padTX);
+    DmaUartMaster(XSERCOM *_s, uint8_t _dma_channel, uint8_t _pinRX, uint8_t _pinTX, SercomRXPad _padRX, SercomUartTXPad _padTX);
     void begin(unsigned long baudRate);
     void begin(unsigned long baudrate, uint16_t config);
     
@@ -32,10 +32,9 @@ class DmaUartMaster {
     int poll();
     
   private:
-    Sercom *sercom;
-    SERCOM arduino_sercom;
+    XSERCOM* sercom;
 
-    uint32_t dma_channel;
+    uint8_t dma_channel;
     uint8_t uc_pinRX;
     uint8_t uc_pinTX;
     SercomRXPad uc_padRX;
@@ -50,9 +49,8 @@ class DmaUartMaster {
     SercomParityMode extractParity(uint16_t config);
     
     // DmacDescriptors must be 16 bit aligned
-    __attribute__((__aligned__(16)))
-    DmacDescriptor tx_desc;
-    DmacDescriptor rx_desc;
+    DmacDescriptor& tx_desc;
+    DmacDescriptor rx_desc __attribute__((__aligned__(16)));
     
 };
 
