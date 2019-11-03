@@ -10,8 +10,8 @@
 #define DMAUARTMASTER_H_
 
 #include "XSERCOM.h"
-
-class DmaUartMaster {
+#include "callback.h"
+class DmaUartMaster : public Callback {
   public:
     enum {
       is_busy,
@@ -31,6 +31,12 @@ class DmaUartMaster {
     // returns the current state
     int poll();
     
+    // stop transfer
+    void stopTransfer();
+    
+    // callback function
+    void callback (int) override final;
+    
   private:
     XSERCOM* sercom;
 
@@ -43,7 +49,8 @@ class DmaUartMaster {
     unsigned long int last_transfer;
     unsigned long int timeout;
     int current_state;
-    void setup_descriptors();
+    void setupDescriptors();
+    void transferStart();
     SercomNumberStopBit extractNbStopBit(uint16_t config);
     SercomUartCharSize extractCharSize(uint16_t config);
     SercomParityMode extractParity(uint16_t config);

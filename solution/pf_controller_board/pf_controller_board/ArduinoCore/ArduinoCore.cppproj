@@ -250,6 +250,9 @@
     </ToolchainSettings>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="include\app\callback.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="include\app\dmashared.h">
       <SubType>compile</SubType>
     </Compile>

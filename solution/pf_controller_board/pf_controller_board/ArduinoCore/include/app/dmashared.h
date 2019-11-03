@@ -4,17 +4,22 @@
  * Created: 3/11/2019 11:15:33 PM
  *  Author: Joseph
  */ 
-#include "Arduino.h"
-#include "dmac.h"
 #ifndef DMASHARED_H_
 #define DMASHARED_H_
 
+#include "Arduino.h"
+#include "dmac.h"
+#include "callback.h"
 
 class Dma{
   public:
   static DmacDescriptor* firstDesc(uint8_t channel);
   static DmacDescriptor* workingDesc(uint8_t channel);
-  static inline Dmac* getDmac();  // conversion to get rid of macro
+  static uint8_t getSercomTx(uint8_t sercom_id);
+  static uint8_t getSercomRx(uint8_t sercom_id);
+  static void registerChannel(uint8_t, Callback*);
+  static void irqHandler();
+  static void swTrigger(uint8_t channel);
 };
 
 

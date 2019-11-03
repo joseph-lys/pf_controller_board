@@ -23,7 +23,8 @@ DmaUartMaster::DmaUartMaster(XSERCOM *_s, uint8_t _dma_channel, uint8_t _pinRX, 
     uc_padTX = _padTX;
     timeout = 500000;
     last_transfer = micros();
-    setup_descriptors();
+    setupDescriptors();
+    Dma::registerChannel(dma_channel, this);
 }
 
 void DmaUartMaster::begin(unsigned long baudrate)
@@ -42,38 +43,45 @@ int DmaUartMaster::poll() {
 
 void DmaUartMaster::transfer(uint8_t* _tx_buf, uint32_t _tx_len, unsigned long int timeout) {
   
-  __disable_irq();
-  // select DMA channel
-  DMAC->CHID.reg = DMAC_CHID_ID(dma_channel);
-  
-  // reset DMA channel
-  DMAC->CHCTRLA.bit.ENABLE = 0;
-  DMAC->CHCTRLA.reg = DMAC_CHCTRLA_SWRST;
-  DMAC->SWTRIGCTRL.reg = ~(uint32_t{1} << dma_channel);
-  
-  // set configurations 
-  DMAC_CHCTRLB_Type ch_ctrl_b;
-  ch_ctrl_b.reg = 0;
-  
-  
-  
-  
-  DMAC->CHCTRLB.reg = ch_ctrl_b.reg;
-  
-  /* Set transfer size, source address and destination address */
-  tx_desc.BTCNT.reg = _tx_len;
-  tx_desc.SRCADDR.reg = reinterpret_cast<uint32_t>(_tx_buf);
-  tx_desc.DESCADDR.reg = 0;
-  
-  // enable dma
-  DMAC->CHCTRLA.bit.ENABLE = 1;
-  __enable_irq();
-  
-  // enable interrupt
-  
+    /* Set transfer size, source address and destination address */
+    tx_desc.BTCNT.reg = _tx_len;
+    tx_desc.SRCADDR.reg = reinterpret_cast<uint32_t>(_tx_buf);
+    tx_desc.DESCADDR.reg = 0;
 }
 
-void DmaUartMaster::setup_descriptors() {
+void DmaUartMaster::transferStart() {
+  Dmac* dmac = DMAC;
+  
+  // set configurations
+  DMAC_CHCTRLB_Type ch_ctrl_b;
+  ch_ctrl_b.reg = 0;
+  ch_ctrl_b.bit.EVACT = DMAC_CHCTRLB_EVACT_NOACT_Val;
+  ch_ctrl_b.bit.EVIE = 0;  // no input event
+  ch_ctrl_b.bit.EVOE = 0;  // no output event
+  ch_ctrl_b.bit.LVL = DMAC_CHCTRLB_LVL_LVL1_Val;  // reserve one level for SPI
+  ch_ctrl_b.bit.TRIGSRC = Dma::getSercomTx(sercom->getSercomId());
+  ch_ctrl_b.bit.TRIGACT = DMAC_CHCTRLB_TRIGACT_TRANSACTION_Val;  // 
+  dmac->CHCTRLB.reg = ch_ctrl_b.reg;
+  
+
+  
+  __disable_irq();
+  // select DMA channel
+  dmac->CHID.bit.ID = dma_channel;
+  
+  // enable dma
+  DMAC_CHCTRLA_Type ch_ctrl_a{0};
+  dmac->CHCTRLA.bit.ENABLE = 1;
+
+  // enable interrupts
+  dmac->CHINTENSET.reg = DMAC_CHINTFLAG_TERR | DMAC_CHINTFLAG_TCMPL;
+  __enable_irq();
+  
+  // software trigger start (first byte in Tx)
+  Dma::swTrigger(dma_channel);
+}
+
+void DmaUartMaster::setupDescriptors() {
   // initialize descriptor data
   tx_desc.BTCNT.reg = 0;
   tx_desc.BTCTRL.reg = 0;
@@ -118,6 +126,36 @@ void DmaUartMaster::begin(unsigned long baudrate, uint16_t config) {
   sercom->enableUART();
 }
 
+void DmaUartMaster::stopTransfer() {
+  if(current_state == is_busy) {
+    current_state = is_timeout;
+  }
+  Dmac* dmac = DMAC;
+  dmac->CHID.bit.ID = dma_channel;
+  
+  // channel disable
+  dmac->CHCTRLA.bit.ENABLE = 1;
+  while(dmac->CHCTRLA.bit.ENABLE) {}  // wait for disable
+  
+  // sw reset
+  dmac->CHCTRLA.bit.SWRST = 1;
+  while(dmac->CHCTRLA.bit.SWRST) {}  // wait for reset
+  
+  // cleanup interrupts
+  dmac->CHINTENCLR.reg = DMAC_CHINTFLAG_TERR | DMAC_CHINTFLAG_TCMPL;
+}
+
+void DmaUartMaster::callback(int status) {
+  switch(status) {
+    case Callback::is_error:
+      // todo
+      break;
+    case Callback::is_done:
+      current_state = is_done;
+      stopTransfer();
+      break;
+  }
+}
 
 SercomNumberStopBit DmaUartMaster::extractNbStopBit(uint16_t config) {
   switch(config & HARDSER_STOP_BIT_MASK)
