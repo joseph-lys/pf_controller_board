@@ -153,7 +153,7 @@ SECTIONS
 		. = ALIGN(4);
 		/* All data end */
 		__data_end__ = .;
-
+		. = ALIGN(16);
 	} > RAM
 
 	.bss :
