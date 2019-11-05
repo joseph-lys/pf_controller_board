@@ -90,6 +90,12 @@ void Dma::swTrigger(uint8_t channel){
 
 void Dma::init() {
   Dmac* dmac = DMAC;
+  
+  PM->AHBMASK.bit.DMAC_ = 1;
+  
+  NVIC_EnableIRQ(DMAC_IRQn);
+  NVIC_SetPriority(DMAC_IRQn, 1);
+  
   dmac->CTRL.bit.DMAENABLE = 0;
   while (0 != dmac->CTRL.bit.DMAENABLE) {}
   dmac->CTRL.bit.SWRST = 1;

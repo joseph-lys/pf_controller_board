@@ -113,9 +113,6 @@ int pinPeripheral( uint32_t ulPin, EPioType ulPeripheral )
     break ;
   }
 
-/// Additional configuration for SERCOM 2
-  pinPeripheral(2, PIO_SERCOM);  // D2, RX
-  pinPeripheral(3, PIO_SERCOM_ALT);  // D3, TX
   return 0l ;
 }
 

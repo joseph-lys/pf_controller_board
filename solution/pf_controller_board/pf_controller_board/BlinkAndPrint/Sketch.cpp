@@ -1,7 +1,7 @@
 ﻿/*Begining of Auto generated code by Atmel studio */
 #include <Arduino.h>
 #include "dmashared.h"
-
+#include "wiring_private.h"
 /*End of auto generated code by Atmel studio */
 
 
@@ -11,6 +11,10 @@
 #define LED_PIN 13
 void setup() {
   // put your setup code here, to run once:
+  
+  /// Additional configuration for SERCOM 2
+  pinPeripheral(2, PIO_SERCOM);  // D2, RX
+  pinPeripheral(3, PIO_SERCOM_ALT);  // D3, TX
   SerialUSB.begin(1000000);
   Serial1.begin(9600);
   pinMode(LED_PIN, OUTPUT);

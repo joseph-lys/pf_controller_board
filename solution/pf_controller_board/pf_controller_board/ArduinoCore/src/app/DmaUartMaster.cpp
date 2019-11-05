@@ -125,7 +125,8 @@ void DmaUartMaster::begin(unsigned long baudrate, uint16_t config) {
   sercom->initUART(UART_INT_CLOCK, SAMPLE_RATE_x16, baudrate);
   sercom->initFrame(extractCharSize(config), LSB_FIRST, extractParity(config), extractNbStopBit(config));
   sercom->initPads(uc_padTX, uc_padRX);
-
+  NVIC_DisableIRQ(SERCOM2_IRQn);
+  sercom->disableDataRegisterEmptyInterruptUART();
   sercom->enableUART();
 }
 
