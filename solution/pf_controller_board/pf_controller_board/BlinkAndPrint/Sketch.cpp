@@ -1,5 +1,6 @@
 ﻿/*Begining of Auto generated code by Atmel studio */
 #include <Arduino.h>
+#include "dmashared.h"
 
 /*End of auto generated code by Atmel studio */
 
@@ -13,6 +14,7 @@ void setup() {
   SerialUSB.begin(1000000);
   Serial1.begin(9600);
   pinMode(LED_PIN, OUTPUT);
+  Dma::init();
 }
 
 void loop() {
@@ -30,4 +32,12 @@ void loop() {
   digitalWrite(LED_PIN, LOW);
   Serial1.println("SERIAL1_TEST_LOAD");
   delay(1000);
+  /// Debug configurations
+  Pm* pm = PM;
+  Sercom* sercom = SERCOM2;
+  Dmac* dmac = DMAC;
+  DmacDescriptor* first_desc = Dma::firstDesc(0);
+  DmacDescriptor* working_desc = Dma::workingDesc(0);
+  
+  delay(0);
 }

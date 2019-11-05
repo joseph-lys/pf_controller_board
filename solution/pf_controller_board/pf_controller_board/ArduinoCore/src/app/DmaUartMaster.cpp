@@ -42,14 +42,14 @@ int DmaUartMaster::poll() {
 }
 
 void DmaUartMaster::transfer(uint8_t* _tx_buf, uint32_t _tx_len, unsigned long int timeout) {
-  
+    setupTxConfig();
     /* Set transfer size, source address and destination address */
     tx_desc.BTCNT.reg = _tx_len;
-    tx_desc.SRCADDR.reg = reinterpret_cast<uint32_t>(_tx_buf);
+    tx_desc.SRCADDR.reg = reinterpret_cast<uint32_t>(_tx_buf) + static_cast<uint32_t>(_tx_len);
     tx_desc.DESCADDR.reg = 0;
+    transferStart();
 }
-
-void DmaUartMaster::transferStart() {
+void DmaUartMaster::setupTxConfig() {
   Dmac* dmac = DMAC;
   
   // set configurations
@@ -60,21 +60,24 @@ void DmaUartMaster::transferStart() {
   ch_ctrl_b.bit.EVOE = 0;  // no output event
   ch_ctrl_b.bit.LVL = DMAC_CHCTRLB_LVL_LVL1_Val;  // reserve one level for SPI
   ch_ctrl_b.bit.TRIGSRC = Dma::getSercomTx(sercom->getSercomId());
-  ch_ctrl_b.bit.TRIGACT = DMAC_CHCTRLB_TRIGACT_TRANSACTION_Val;  // 
-  dmac->CHCTRLB.reg = ch_ctrl_b.reg;
+  ch_ctrl_b.bit.TRIGACT = DMAC_CHCTRLB_TRIGACT_TRANSACTION_Val;  //
   
+  __disable_irq();
+  dmac->CHID.bit.ID = dma_channel;
+  dmac->CHCTRLB.reg = ch_ctrl_b.reg;
+  __enable_irq();
+}
 
+void DmaUartMaster::transferStart() {
+  Dmac* dmac = DMAC;
   
   __disable_irq();
   // select DMA channel
   dmac->CHID.bit.ID = dma_channel;
-  
-  // enable dma
-  DMAC_CHCTRLA_Type ch_ctrl_a{0};
-  dmac->CHCTRLA.bit.ENABLE = 1;
-
   // enable interrupts
   dmac->CHINTENSET.reg = DMAC_CHINTFLAG_TERR | DMAC_CHINTFLAG_TCMPL;
+  // enable dma
+  dmac->CHCTRLA.bit.ENABLE = 1;
   __enable_irq();
   
   // software trigger start (first byte in Tx)

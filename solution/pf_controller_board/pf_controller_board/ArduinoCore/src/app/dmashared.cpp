@@ -26,7 +26,7 @@ void Dma::registerChannel(uint8_t channel, Callback* ins) {
 }
 
 static uint8_t getSercomTx(uint8_t sercom_id) {
-  return sercom_id * 2;
+  return sercom_id * 2 + 2;
 }
 
 static uint8_t getSercomRx(uint8_t sercom_id) {
@@ -86,4 +86,23 @@ void Dma::swTrigger(uint8_t channel){
     default:
       break;
   }
+}
+
+void Dma::init() {
+  Dmac* dmac = DMAC;
+  dmac->CTRL.bit.DMAENABLE = 0;
+  while (0 != dmac->CTRL.bit.DMAENABLE) {}
+  dmac->CTRL.bit.SWRST = 1;
+  while (0 != dmac->CTRL.bit.SWRST) {}
+  dmac->CTRL.bit.LVLEN0 = 1;
+  dmac->CTRL.bit.LVLEN1 = 1;
+  dmac->CTRL.bit.LVLEN2 = 1;
+  dmac->CTRL.bit.LVLEN3 = 1;
+  dmac->CTRL.bit.DMAENABLE = 1;
+  while (0 != dmac->CTRL.bit.DMAENABLE) {}
+}
+
+// attach irq handler
+void DMAC_Handler() {
+  Dma::irqHandler();
 }

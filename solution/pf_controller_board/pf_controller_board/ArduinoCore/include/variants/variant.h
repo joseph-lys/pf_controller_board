@@ -179,7 +179,7 @@ static const uint8_t SCL = PIN_WIRE_SCL;
 */
 extern SERCOM sercom0;
 extern SERCOM sercom1;
-extern SERCOM sercom2;
+extern XSERCOM sercom2;
 extern SERCOM sercom3;
 extern SERCOM sercom4;
 extern XSERCOM sercom5;

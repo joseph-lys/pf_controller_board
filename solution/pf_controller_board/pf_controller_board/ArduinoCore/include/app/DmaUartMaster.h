@@ -50,7 +50,9 @@ class DmaUartMaster : public Callback {
     unsigned long int timeout;
     int current_state;
     void setupDescriptors();
+    void setupTxConfig();
     void transferStart();
+    void init();
     SercomNumberStopBit extractNbStopBit(uint16_t config);
     SercomUartCharSize extractCharSize(uint16_t config);
     SercomParityMode extractParity(uint16_t config);
@@ -58,7 +60,6 @@ class DmaUartMaster : public Callback {
     // DmacDescriptors must be 16 bit aligned
     DmacDescriptor& tx_desc;
     DmacDescriptor rx_desc __attribute__((__aligned__(16)));
-    
 };
 
 

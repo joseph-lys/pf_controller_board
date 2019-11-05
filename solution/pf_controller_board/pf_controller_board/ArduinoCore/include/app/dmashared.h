@@ -20,6 +20,7 @@ class Dma{
   static void registerChannel(uint8_t, Callback*);
   static void irqHandler();
   static void swTrigger(uint8_t channel);
+  static void init();
 };
 
 
