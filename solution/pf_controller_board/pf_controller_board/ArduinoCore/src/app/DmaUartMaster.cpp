@@ -32,6 +32,25 @@ void DmaUartMaster::begin(unsigned long baudrate)
   begin(baudrate, SERIAL_8N1);
 }
 
+void DmaUartMaster::begin(unsigned long baudrate, uint16_t config) {
+  pinPeripheral(uc_pinRX, g_APinDescription[uc_pinRX].ulPinType);
+  pinPeripheral(uc_pinTX, g_APinDescription[uc_pinTX].ulPinType);
+  
+  sercom->initUART(UART_INT_CLOCK, SAMPLE_RATE_x16, baudrate);
+  sercom->initFrame(extractCharSize(config), LSB_FIRST, extractParity(config), extractNbStopBit(config));
+  sercom->initPads(uc_padTX, uc_padRX);
+  NVIC_DisableIRQ(SERCOM2_IRQn);
+  // clear some interrupts
+  SERCOM2->USART.INTENCLR.bit.CTSIC = 1;
+  SERCOM2->USART.INTENCLR.bit.DRE = 1;
+  SERCOM2->USART.INTENCLR.bit.RXBRK = 1;
+  SERCOM2->USART.INTENCLR.bit.RXC = 1;
+  SERCOM2->USART.INTENCLR.bit.RXS = 1;
+  // SERCOM2->USART.INTENCLR.bit.TXC = 1;
+  SERCOM2->USART.INTENSET.bit.TXC = 1;
+  sercom->enableUART();
+}
+
 int DmaUartMaster::poll() {
   if (current_state == is_busy) {
     if(micros() - last_transfer > timeout) {
@@ -41,7 +60,7 @@ int DmaUartMaster::poll() {
   return current_state;
 }
 
-void DmaUartMaster::transfer(uint8_t* _tx_buf, uint32_t _tx_len, unsigned long int timeout) {
+void DmaUartMaster::write(uint8_t* _tx_buf, uint32_t _tx_len) {
   stopTransfer();
   setupTxConfig();
   /* Set transfer size, source address and destination address */
@@ -99,7 +118,7 @@ void DmaUartMaster::setupDescriptors() {
   // Set descriptor for TX
   tx_desc.BTCTRL.bit.VALID = 1;
   tx_desc.BTCTRL.bit.EVOSEL = DMAC_BTCTRL_EVOSEL_DISABLE_Val;  
-  tx_desc.BTCTRL.bit.BLOCKACT = DMAC_BTCTRL_BLOCKACT_NOACT_Val;
+  tx_desc.BTCTRL.bit.BLOCKACT = DMAC_BTCTRL_BLOCKACT_INT_Val;
   tx_desc.BTCTRL.bit.BEATSIZE = DMAC_BTCTRL_BEATSIZE_BYTE_Val;
   tx_desc.BTCTRL.bit.SRCINC = 1;
   tx_desc.BTCTRL.bit.DSTINC = 0;  // writes to fixed sercom->DATA address
@@ -113,7 +132,7 @@ void DmaUartMaster::setupDescriptors() {
   // Set descriptor for RX
   rx_desc.BTCTRL.bit.VALID = 1;
   rx_desc.BTCTRL.bit.EVOSEL = DMAC_BTCTRL_EVOSEL_DISABLE_Val;
-  rx_desc.BTCTRL.bit.BLOCKACT = DMAC_BTCTRL_BLOCKACT_NOACT_Val;
+  rx_desc.BTCTRL.bit.BLOCKACT = DMAC_BTCTRL_BLOCKACT_INT_Val;
   rx_desc.BTCTRL.bit.BEATSIZE = DMAC_BTCTRL_BEATSIZE_BYTE_Val;
   rx_desc.BTCTRL.bit.SRCINC = 0;  // read from fixed sercom->DATA address
   rx_desc.BTCTRL.bit.DSTINC = 1;  
@@ -123,24 +142,6 @@ void DmaUartMaster::setupDescriptors() {
   rx_desc.SRCADDR.reg = reinterpret_cast<uint32_t>(&(sercom->getSercomPointer()->USART.DATA.reg));
   rx_desc.DSTADDR.reg = 0;  // undetermined until transfer initiated 
   rx_desc.DESCADDR.reg = 0;  // just terminate
-}
-
-void DmaUartMaster::begin(unsigned long baudrate, uint16_t config) {
-  pinPeripheral(uc_pinRX, g_APinDescription[uc_pinRX].ulPinType);
-  pinPeripheral(uc_pinTX, g_APinDescription[uc_pinTX].ulPinType);
-  
-  sercom->initUART(UART_INT_CLOCK, SAMPLE_RATE_x16, baudrate);
-  sercom->initFrame(extractCharSize(config), LSB_FIRST, extractParity(config), extractNbStopBit(config));
-  sercom->initPads(uc_padTX, uc_padRX);
-  NVIC_DisableIRQ(SERCOM2_IRQn);
-  // clear some interrupts
-  SERCOM2->USART.INTENCLR.bit.CTSIC = 1;
-  SERCOM2->USART.INTENCLR.bit.DRE = 1;
-  SERCOM2->USART.INTENCLR.bit.RXBRK = 1;
-  SERCOM2->USART.INTENCLR.bit.RXC = 1;
-  SERCOM2->USART.INTENCLR.bit.RXS = 1;
-  SERCOM2->USART.INTENCLR.bit.TXC = 1;
-  sercom->enableUART();
 }
 
 void DmaUartMaster::stopTransfer() {
@@ -161,6 +162,8 @@ void DmaUartMaster::stopTransfer() {
 }
 
 void DmaUartMaster::callback(int status) {
+  DmacDescriptor* working = Dma::workingDesc(dma_channel);
+  volatile uint32_t cnt = working->BTCNT.reg;
   stopTransfer();
 }
 

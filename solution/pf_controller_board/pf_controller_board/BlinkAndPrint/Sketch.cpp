@@ -12,12 +12,12 @@
 void setup() {
   // put your setup code here, to run once:
   Dma::init();
-  /// Additional configuration for SERCOM 2
-  pinPeripheral(2, PIO_SERCOM);  // D2, TX
-  pinPeripheral(3, PIO_SERCOM_ALT);  // D3, RX
+  /// Additional configuration for SERCOM 2 as UART
   SerialUSB.begin(1000000);
   Serial1.begin(9600);
   Serial.begin(9600);
+  pinPeripheral(2, PIO_SERCOM_ALT);  // D2, TX
+  pinPeripheral(3, PIO_SERCOM_ALT);  // D3, RX
   pinMode(LED_PIN, OUTPUT);
   delay(3000);
 }
@@ -46,7 +46,7 @@ void loop() {
   DmacDescriptor* first = Dma::firstDesc(0);
   DmacDescriptor* working = Dma::workingDesc(0);
   
-  Serial.transfer(static_cast<uint8_t*>(dma_test), sizeof(dma_test), 10000);
+  Serial.write(dma_test, sizeof(dma_test));
   
   delay(1000);
 }

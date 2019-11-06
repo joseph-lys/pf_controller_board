@@ -23,10 +23,7 @@ class DmaUartMaster : public Callback {
     void begin(unsigned long baudrate, uint16_t config);
     
     // transmit only
-    void transfer(uint8_t* _tx_buf, uint32_t _tx_len, unsigned long int timeout);
-    
-    // transmit and receive
-    void transfer(uint8_t* _tx_buf, uint32_t _tx_len, uint8_t* _rx_buf, uint32_t _rx_len, unsigned long int _timeout);
+    void write(uint8_t* _tx_buf, uint32_t _tx_len);
     
     // returns the current state
     int poll();
