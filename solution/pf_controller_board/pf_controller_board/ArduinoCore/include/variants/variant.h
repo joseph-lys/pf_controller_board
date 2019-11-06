@@ -40,7 +40,9 @@
 
 #ifdef __cplusplus
 #include "SERCOM.h"
+#include "XSERCOM.h"
 #include "Uart.h"
+#include "DmaUartMaster.h"
 #endif // __cplusplus
 
 #ifdef __cplusplus
@@ -188,12 +190,12 @@ static const uint8_t SCL = PIN_WIRE_SCL;
 */
 extern SERCOM sercom0;
 extern SERCOM sercom1;
-extern SERCOM sercom2;
+extern XSERCOM sercom2;
 extern SERCOM sercom3;
 extern SERCOM sercom4;
 extern SERCOM sercom5;
 
-extern Uart Serial;
+extern DmaUartMaster Serial;
 extern Uart Serial1;
 
 #endif

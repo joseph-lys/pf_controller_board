@@ -16,8 +16,9 @@ void setup() {
   SerialUSB.begin(1000000);
   Serial1.begin(9600);
   Serial.begin(9600);
-  pinPeripheral(2, PIO_SERCOM_ALT);  // D2, TX
-  pinPeripheral(3, PIO_SERCOM_ALT);  // D3, RX
+  //RX: D3 (PA09), TX: D4 (PA08)
+  pinPeripheral(3, PIO_SERCOM_ALT);
+  pinPeripheral(4, PIO_SERCOM_ALT);
   pinMode(LED_PIN, OUTPUT);
   delay(3000);
 }
