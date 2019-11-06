@@ -58,7 +58,8 @@ class DmaUartMaster : public Callback {
     SercomParityMode extractParity(uint16_t config);
     
     // DmacDescriptors must be 16 bit aligned
-    DmacDescriptor& tx_desc;
+    DmacDescriptor* const ch_desc;
+    DmacDescriptor tx_desc __attribute__((__aligned__(16)));
     DmacDescriptor rx_desc __attribute__((__aligned__(16)));
 };
 

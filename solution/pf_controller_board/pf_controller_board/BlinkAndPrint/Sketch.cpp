@@ -11,19 +11,22 @@
 #define LED_PIN 13
 void setup() {
   // put your setup code here, to run once:
-  
+  Dma::init();
   /// Additional configuration for SERCOM 2
-  pinPeripheral(2, PIO_SERCOM);  // D2, RX
-  pinPeripheral(3, PIO_SERCOM_ALT);  // D3, TX
+  pinPeripheral(2, PIO_SERCOM);  // D2, TX
+  pinPeripheral(3, PIO_SERCOM_ALT);  // D3, RX
   SerialUSB.begin(1000000);
   Serial1.begin(9600);
+  Serial.begin(9600);
   pinMode(LED_PIN, OUTPUT);
-  Dma::init();
+  delay(3000);
 }
 
+uint8_t dma_test[] = "DMA";
 void loop() {
   // put your main code here, to run repeatedly:
   int x;
+  
   SerialUSB.println("USB_TEST_LOAD");
   while(Serial1.available()) {
     x = Serial1.read();
@@ -35,13 +38,15 @@ void loop() {
   delay(1000);
   digitalWrite(LED_PIN, LOW);
   Serial1.println("SERIAL1_TEST_LOAD");
-  delay(1000);
+  
   /// Debug configurations
   Pm* pm = PM;
   Sercom* sercom = SERCOM2;
   Dmac* dmac = DMAC;
-  DmacDescriptor* first_desc = Dma::firstDesc(0);
-  DmacDescriptor* working_desc = Dma::workingDesc(0);
+  DmacDescriptor* first = Dma::firstDesc(0);
+  DmacDescriptor* working = Dma::workingDesc(0);
   
-  delay(0);
+  Serial.transfer(static_cast<uint8_t*>(dma_test), sizeof(dma_test), 10000);
+  
+  delay(1000);
 }

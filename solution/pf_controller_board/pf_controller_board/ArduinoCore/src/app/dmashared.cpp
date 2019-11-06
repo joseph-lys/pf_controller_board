@@ -25,33 +25,28 @@ void Dma::registerChannel(uint8_t channel, Callback* ins) {
   channel_callbacks[channel] = ins;
 }
 
-static uint8_t getSercomTx(uint8_t sercom_id) {
+uint8_t Dma::getSercomTx(uint8_t sercom_id) {
   return sercom_id * 2 + 2;
 }
 
-static uint8_t getSercomRx(uint8_t sercom_id) {
+uint8_t Dma::getSercomRx(uint8_t sercom_id) {
   return sercom_id * 2 + 1;
 }
 
 void Dma::irqHandler() {
   uint32_t i;
+  uint32_t int_flag;
   Dmac* dmac = DMAC;
   const uint32_t chint = dmac->INTSTATUS.vec.CHINT;
   int deferred[DMA_MAX_CHANNELS_USED]{Callback::is_nothing};
   
   for(i = 0; i < DMA_MAX_CHANNELS_USED; i++) {
     if(chint & (1ul << i)) {
+      __disable_irq();
       dmac->CHID.bit.ID = i;
-      if(dmac->CHINTFLAG.bit.TERR) {
-        deferred[i] = Callback::is_error;
-      } else if (dmac->CHINTFLAG.bit.TCMPL) {
-        deferred[i] = Callback::is_done;
-      }
-    }
-  }
-  for(i=0; i<DMA_MAX_CHANNELS_USED; i++) {
-    if(deferred[i] != Callback::is_nothing) {
-      channel_callbacks[i]->callback(deferred[i]);
+      int_flag = dmac->CHINTFLAG.reg;
+      __enable_irq();
+      channel_callbacks[i]->callback(int_flag);
     }
   }
 }
@@ -90,22 +85,27 @@ void Dma::swTrigger(uint8_t channel){
 
 void Dma::init() {
   Dmac* dmac = DMAC;
-  
+  /// configure power management
   PM->AHBMASK.bit.DMAC_ = 1;
   
+  /// configure NVIC
   NVIC_EnableIRQ(DMAC_IRQn);
   NVIC_SetPriority(DMAC_IRQn, 1);
   
+  /// Configure common DMAC stuff
   dmac->CTRL.bit.DMAENABLE = 0;
   while (0 != dmac->CTRL.bit.DMAENABLE) {}
   dmac->CTRL.bit.SWRST = 1;
   while (0 != dmac->CTRL.bit.SWRST) {}
+  
+  dmac->BASEADDR.reg = reinterpret_cast<uint32_t>(&(dma_first_desc[0]));  
+  dmac->WRBADDR.reg = reinterpret_cast<uint32_t>(&(dma_working_desc[0]));
   dmac->CTRL.bit.LVLEN0 = 1;
   dmac->CTRL.bit.LVLEN1 = 1;
   dmac->CTRL.bit.LVLEN2 = 1;
   dmac->CTRL.bit.LVLEN3 = 1;
   dmac->CTRL.bit.DMAENABLE = 1;
-  while (0 != dmac->CTRL.bit.DMAENABLE) {}
+  while (1 != dmac->CTRL.bit.DMAENABLE) {}
 }
 
 // attach irq handler
