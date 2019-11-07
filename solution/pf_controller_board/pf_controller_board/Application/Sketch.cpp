@@ -23,7 +23,7 @@ void setup() {
   delay(3000);
 }
 
-uint8_t dma_test[] = "DMA";
+uint8_t dma_test[] = "DMA\n";
 void loop() {
   // put your main code here, to run repeatedly:
   int x;

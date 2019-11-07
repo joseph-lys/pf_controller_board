@@ -10,18 +10,31 @@
 #define DMAINSTANCE_H_
 
 #include "dmac.h"
-
+#include "callback.h"
 class DmaInstance {
  public:
-  explicit DmaInstance(uint8_t channel);
+  explicit DmaInstance(uint8_t channel, Callback* callback_instance);
   virtual ~DmaInstance();
   const uint8_t dma_channel;
-  void startDmac();
-  void stopDmac();
-  // setup config 
-  void setupChannelConfig();
-  void setupFirstDescriptor();
+  DmacDescriptor* const ch_desc;
   
+  // Channel configuration for Sercom Tx
+  void setupTxConfig(uint8_t sercom_id);
+  
+  // Channel configuration for Sercom Rx
+  void setupRxConfig(uint8_t sercom_id);
+  
+  // Descriptor configuration for Sercom Tx
+  void setupTxDesc(uint32_t tx_address, uint8_t* tx_buf, uint32_t len);
+  
+  // Descriptor configuration for Sercom Rx
+  void setupRxDesc(uint32_t rx_address, uint8_t* rx_buf, uint32_t len);
+  
+  // Start dmac channel
+  void start();
+  
+  // Stop dmac channel
+  void stop();
 };
 
 
