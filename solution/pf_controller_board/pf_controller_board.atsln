@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Atmel Studio Solution File, Format Version 11.00
 VisualStudioVersion = 14.0.23107.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{E66E83B9-2572-4076-B26E-6BE79FF3018A}") = "Application", "pf_controller_board\BlinkAndPrint\Application.cppproj", "{DCE6C7E3-EE26-4D79-826B-08594B9AD897}"
-EndProject
 Project("{E66E83B9-2572-4076-B26E-6BE79FF3018A}") = "ArduinoCore", "pf_controller_board\ArduinoCore\ArduinoCore.cppproj", "{648B1C54-2FAC-4BD7-919F-475DF035EB6F}"
+EndProject
+Project("{E66E83B9-2572-4076-B26E-6BE79FF3018A}") = "Application", "pf_controller_board\Application\Application.cppproj", "{DCE6C7E3-EE26-4D79-826B-08594B9AD897}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -13,14 +13,14 @@ Global
 		Release|ARM = Release|ARM
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{DCE6C7E3-EE26-4D79-826B-08594B9AD897}.Debug|ARM.ActiveCfg = Debug|ARM
-		{DCE6C7E3-EE26-4D79-826B-08594B9AD897}.Debug|ARM.Build.0 = Debug|ARM
-		{DCE6C7E3-EE26-4D79-826B-08594B9AD897}.Release|ARM.ActiveCfg = Release|ARM
-		{DCE6C7E3-EE26-4D79-826B-08594B9AD897}.Release|ARM.Build.0 = Release|ARM
 		{648B1C54-2FAC-4BD7-919F-475DF035EB6F}.Debug|ARM.ActiveCfg = Debug|ARM
 		{648B1C54-2FAC-4BD7-919F-475DF035EB6F}.Debug|ARM.Build.0 = Debug|ARM
 		{648B1C54-2FAC-4BD7-919F-475DF035EB6F}.Release|ARM.ActiveCfg = Release|ARM
 		{648B1C54-2FAC-4BD7-919F-475DF035EB6F}.Release|ARM.Build.0 = Release|ARM
+		{DCE6C7E3-EE26-4D79-826B-08594B9AD897}.Debug|ARM.ActiveCfg = Debug|ARM
+		{DCE6C7E3-EE26-4D79-826B-08594B9AD897}.Debug|ARM.Build.0 = Debug|ARM
+		{DCE6C7E3-EE26-4D79-826B-08594B9AD897}.Release|ARM.ActiveCfg = Release|ARM
+		{DCE6C7E3-EE26-4D79-826B-08594B9AD897}.Release|ARM.Build.0 = Release|ARM
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

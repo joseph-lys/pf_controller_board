@@ -1,6 +1,6 @@
 ﻿/*Begining of Auto generated code by Atmel studio */
 #include <Arduino.h>
-#include "dmashared.h"
+#include "DmaCommon.h"
 #include "wiring_private.h"
 /*End of auto generated code by Atmel studio */
 

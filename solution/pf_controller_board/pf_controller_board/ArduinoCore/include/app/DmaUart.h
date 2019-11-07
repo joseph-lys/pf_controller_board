@@ -11,15 +11,17 @@
 
 #include "XSERCOM.h"
 #include "callback.h"
-class DmaUartMaster : public Callback {
+class DmaUart : public Callback {
   public:
     enum {
       is_busy,
       is_done,
       is_timeout
     };
-    DmaUartMaster(XSERCOM *_s, uint8_t _dma_channel, uint8_t _pinRX, uint8_t _pinTX, SercomRXPad _padRX, SercomUartTXPad _padTX);
-    void begin(unsigned long baudRate);
+    DmaUart(XSERCOM *_s, uint8_t _dma_channel, uint8_t _pinRX, uint8_t _pinTX, SercomRXPad _padRX, SercomUartTXPad _padTX);
+    
+    // configure UART to specified settings
+    void begin(unsigned long baudrate);
     void begin(unsigned long baudrate, uint16_t config);
     
     // transmit only
@@ -48,6 +50,8 @@ class DmaUartMaster : public Callback {
     int current_state;
     void setupDescriptors();
     void setupTxConfig();
+    void setupTxDesc(uint8_t* tx_buf, uint32_t tx_len);
+    void setupRxDesc(uint8_t* rx_buf, uint32_t rx_len);
     void transferStart();
     void init();
     SercomNumberStopBit extractNbStopBit(uint16_t config);
@@ -56,8 +60,6 @@ class DmaUartMaster : public Callback {
     
     // DmacDescriptors must be 16 bit aligned
     DmacDescriptor* const ch_desc;
-    DmacDescriptor tx_desc __attribute__((__aligned__(16)));
-    DmacDescriptor rx_desc __attribute__((__aligned__(16)));
 };
 
 

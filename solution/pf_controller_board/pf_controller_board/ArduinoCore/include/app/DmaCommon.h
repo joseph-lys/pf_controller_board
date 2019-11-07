@@ -15,6 +15,7 @@ class Dma{
   public:
   static DmacDescriptor* firstDesc(uint8_t channel);
   static DmacDescriptor* workingDesc(uint8_t channel);
+  static void defaultDesc(DmacDescriptor&);
   static uint8_t getSercomTx(uint8_t sercom_id);
   static uint8_t getSercomRx(uint8_t sercom_id);
   static void registerChannel(uint8_t, Callback*);

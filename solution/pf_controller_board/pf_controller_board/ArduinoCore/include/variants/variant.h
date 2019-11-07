@@ -42,7 +42,7 @@
 #include "SERCOM.h"
 #include "XSERCOM.h"
 #include "Uart.h"
-#include "DmaUartMaster.h"
+#include "DmaUart.h"
 #endif // __cplusplus
 
 #ifdef __cplusplus
@@ -195,7 +195,7 @@ extern SERCOM sercom3;
 extern SERCOM sercom4;
 extern SERCOM sercom5;
 
-extern DmaUartMaster Serial;
+extern DmaUart Serial;
 extern Uart Serial1;
 
 #endif

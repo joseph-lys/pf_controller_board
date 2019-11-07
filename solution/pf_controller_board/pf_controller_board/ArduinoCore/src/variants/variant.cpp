@@ -208,7 +208,7 @@ SERCOM sercom4( SERCOM4 ) ;
 SERCOM sercom5( SERCOM5 ) ;
 
 Uart Serial1( &sercom0, PIN_SERIAL1_RX, PIN_SERIAL1_TX, PAD_SERIAL1_RX, PAD_SERIAL1_TX ) ;
-DmaUartMaster Serial(&sercom2, 0, 3, 4, SERCOM_RX_PAD_1, UART_TX_PAD_0); //RX: D3 (PA09), TX: D4 (PA08)
+DmaUart Serial(&sercom2, 0, 3, 4, SERCOM_RX_PAD_1, UART_TX_PAD_0); //RX: D3 (PA09), TX: D4 (PA08)
 // Uart Serial( &sercom5, PIN_SERIAL_RX, PIN_SERIAL_TX, PAD_SERIAL_RX, PAD_SERIAL_TX ) ;
 void SERCOM0_Handler()
 {

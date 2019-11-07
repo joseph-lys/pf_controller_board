@@ -4,7 +4,7 @@
  * Created: 3/11/2019 10:12:42 PM
  *  Author: Joseph
  */
-#include "dmashared.h"
+#include "DmaCommon.h"
 #include "dmac.h"
 
 #define DMA_MAX_CHANNELS_USED 10
@@ -19,6 +19,25 @@ DmacDescriptor* Dma::firstDesc(uint8_t channel) {
 
 DmacDescriptor* Dma::workingDesc(uint8_t channel) {
   return &(dma_working_desc[channel]);
+}
+
+void Dma::defaultDesc(DmacDescriptor& desc) {
+  desc.BTCNT.reg = 0;
+  desc.BTCNT.reg = 0;
+  
+  // Set descriptor for TX
+  desc.BTCTRL.bit.VALID = 1;
+  desc.BTCTRL.bit.EVOSEL = DMAC_BTCTRL_EVOSEL_DISABLE_Val;
+  desc.BTCTRL.bit.BLOCKACT = DMAC_BTCTRL_BLOCKACT_INT_Val;
+  desc.BTCTRL.bit.BEATSIZE = DMAC_BTCTRL_BEATSIZE_BYTE_Val;
+  desc.BTCTRL.bit.SRCINC = 0;
+  desc.BTCTRL.bit.DSTINC = 0;  
+  desc.BTCTRL.bit.STEPSEL = 0;
+  desc.BTCTRL.bit.STEPSIZE = DMAC_BTCTRL_STEPSIZE_X1_Val;
+  desc.BTCNT.reg = 0;  // undetermined until transfer initiated
+  desc.SRCADDR.reg = 0;  // undetermined until transfer initiated  
+  desc.DESCADDR.reg = 0; 
+  desc.DSTADDR.reg = 0;  
 }
 
 void Dma::registerChannel(uint8_t channel, Callback* ins) {
