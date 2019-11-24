@@ -16,7 +16,7 @@
 // use DMA to continuously read data
 class DmaContinuousReader : public Callback {
  public:
-  explicit DmaContinuousReader(uint8_t _dma_channel, uint32_t rx_source_address);
+  explicit DmaContinuousReader(uint8_t _dma_channel, XSERCOM* _sercom);
   void callback(int) override;
   int readByte();
   uint32_t available();
@@ -34,10 +34,10 @@ class DmaContinuousReader : public Callback {
   };
   DmacDescriptor descriptors[num_blocks - 1]  __attribute__((__aligned__(16)));
   DmaInstance dma_;
-  const uint32_t rx_source_address;
-  uint32_t read_; // number of bytes read
-  uint32_t write_;  // number of bytes written
-  uint32_t work_idx_;  // working buffer index
+  XSERCOM* sercom;
+  volatile uint32_t read_; // number of bytes read
+  volatile uint32_t write_;  // number of bytes written
+  volatile uint32_t work_idx_;  // working buffer index
   volatile uint8_t buffer_[buffer_size];
   const uint8_t dma_channel;
   uint32_t getWrittenCount();
@@ -47,7 +47,7 @@ class DmaContinuousReader : public Callback {
 // Use DMA to transmit a single transaction
 class DmaOneOffWriter : public Callback {
  public:
-  explicit DmaOneOffWriter(uint8_t _dma_channel, uint32_t rx_source_addres);
+  explicit DmaOneOffWriter(uint8_t _dma_channel, XSERCOM* _sercom);
   Callback* post_transfer_callback;
   // begin a single write transaction
   void write(uint8_t* _tx_buf, uint32_t _tx_len);
@@ -62,7 +62,7 @@ class DmaOneOffWriter : public Callback {
   
  protected:
   DmaInstance dma_;
-  const uint32_t tx_source_address;
+  XSERCOM* sercom;
   const uint8_t dma_channel;
   bool is_busy;
 };   

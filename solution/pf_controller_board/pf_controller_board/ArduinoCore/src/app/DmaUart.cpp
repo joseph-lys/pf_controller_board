@@ -13,8 +13,8 @@
 #include "wiring_private.h"
 #include "DmaCommon.h"
 
-DmaContinuousReader::DmaContinuousReader(uint8_t _dma_channel, uint32_t _rx_source_address)
-: dma_(_dma_channel, this), rx_source_address(_rx_source_address), 
+DmaContinuousReader::DmaContinuousReader(uint8_t _dma_channel, XSERCOM* _sercom)
+: dma_(_dma_channel, this), sercom(_sercom), 
 read_(0), write_(0), work_idx_(0), 
 dma_channel(_dma_channel){
 }
@@ -45,7 +45,11 @@ int DmaContinuousReader::readByte() {
 }
 
 uint32_t DmaContinuousReader::available() {
-  return getWrittenCount() - read_;
+  uint32_t diff = getWrittenCount() - read_;
+  if (diff > buffer_size) {
+    diff = 0;
+  }
+  return diff;
 }
 
 void DmaContinuousReader::start() {
@@ -68,8 +72,9 @@ uint32_t DmaContinuousReader::getWrittenCount() {
 }
 
 void DmaContinuousReader::setup(){
+  uint32_t rx_source_address = reinterpret_cast<uint32_t>(&(sercom->getSercomPointer()->USART.DATA.reg));
   // setup rx information
-  dma_.setupRxConfig(dma_channel);
+  dma_.setupRxConfig(sercom->getSercomId());
   
   // setup descriptor information
   dma_.setupRxDescFirst(rx_source_address, const_cast<uint8_t*>(buffer_), block_data_size);
@@ -77,22 +82,22 @@ void DmaContinuousReader::setup(){
     dma_.setupRxDescAny(&(descriptors[i]), rx_source_address, const_cast<uint8_t*>(&buffer_[i * block_data_size]), block_data_size);
   }
   // link all descriptors
-  dma_.ch_desc->DESCADDR.reg = reinterpret_cast<uint32_t>(&(descriptors[0]));
+  dma_.ch_desc->DESCADDR.reg = reinterpret_cast<uint32_t>(&(descriptors[1]));
   for(int i=0; i<num_blocks - 2; i++) {
     descriptors[i].DESCADDR.reg = reinterpret_cast<uint32_t>(&(descriptors[i + 1]));
   }
-  descriptors[num_blocks - 1].DESCADDR.reg = reinterpret_cast<uint32_t>(dma_.ch_desc);
+  descriptors[num_blocks - 2].DESCADDR.reg = reinterpret_cast<uint32_t>(dma_.ch_desc);
 }
 
 
-DmaOneOffWriter::DmaOneOffWriter(uint8_t _dma_channel, uint32_t _tx_source_address) 
-: dma_(_dma_channel, this), tx_source_address(_tx_source_address), dma_channel(_dma_channel), is_busy(false) {
+DmaOneOffWriter::DmaOneOffWriter(uint8_t _dma_channel, XSERCOM* _sercom) 
+: dma_(_dma_channel, this), sercom(_sercom), dma_channel(_dma_channel), is_busy(false) {
 }
 
 void DmaOneOffWriter::write(uint8_t* _tx_buf, uint32_t _tx_len) {
   dma_.stop();
-  dma_.setupTxConfig(dma_channel);
-  dma_.setupTxDescFirst(tx_source_address, _tx_buf, _tx_len);
+  dma_.setupTxDescFirst(reinterpret_cast<uint32_t>(&(sercom->getSercomPointer()->USART.DATA.reg)), _tx_buf, _tx_len);
+  dma_.setupTxConfig(sercom->getSercomId());
   dma_.start();
   is_busy = true;
 }
@@ -111,8 +116,8 @@ bool DmaOneOffWriter::isBusy() {
 
 DmaUart::DmaUart(XSERCOM *_s, uint8_t _rx_dma_channel, uint8_t _tx_dma_channel, uint8_t _pinRX, uint8_t _pinTX, SercomRXPad _padRX, SercomUartTXPad _padTX) 
 : sercom(_s), 
-reader(_rx_dma_channel, reinterpret_cast<uint32_t>(&(sercom->getSercomPointer()->USART.DATA.reg))), 
-writer(_tx_dma_channel, reinterpret_cast<uint32_t>(&(sercom->getSercomPointer()->USART.DATA.reg)))
+reader(_rx_dma_channel, _s), 
+writer(_tx_dma_channel, _s)
 {
     sercom = _s;
     uc_pinRX = _pinRX;
@@ -144,7 +149,7 @@ void DmaUart::begin(unsigned long baudrate, uint16_t config) {
   SERCOM2->USART.INTENSET.bit.TXC = 1;
   sercom->enableUART();
   
-  //reader.start();
+  reader.start();
 }
 
 void DmaUart::write(uint8_t* _tx_buf, uint32_t _tx_len) {
