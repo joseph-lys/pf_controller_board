@@ -11,12 +11,7 @@
 
 class Callback {
   public:
-   enum : int {
-     is_nothing = 0,
-     is_error = -1,
-     is_done = 1
-     };
-   virtual ~Callback(){};
+   virtual ~Callback() { };
    virtual void callback(int) = 0;
 };
 

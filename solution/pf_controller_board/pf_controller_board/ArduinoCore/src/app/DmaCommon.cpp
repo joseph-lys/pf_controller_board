@@ -7,7 +7,7 @@
 #include "DmaCommon.h"
 #include "dmac.h"
 
-#define DMA_MAX_CHANNELS_USED 10
+#define DMA_MAX_CHANNELS_USED 12
 
 static DmacDescriptor dma_first_desc[DMA_MAX_CHANNELS_USED] __attribute__((__aligned__(16)));
 static DmacDescriptor dma_working_desc[DMA_MAX_CHANNELS_USED] __attribute__((__aligned__(16)));
@@ -57,7 +57,6 @@ void Dma::irqHandler() {
   uint32_t int_flag;
   Dmac* dmac = DMAC;
   const uint32_t chint = dmac->INTSTATUS.vec.CHINT;
-  int deferred[DMA_MAX_CHANNELS_USED]{Callback::is_nothing};
   
   for(i = 0; i < DMA_MAX_CHANNELS_USED; i++) {
     if(chint & (1ul << i)) {

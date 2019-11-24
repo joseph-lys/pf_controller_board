@@ -59,10 +59,14 @@ void DmaInstance::setupRxConfig(uint8_t sercom_id) {
   __enable_irq();
 }
 
-void DmaInstance::setupTxDesc(uint32_t tx_address, uint8_t* buf, uint32_t len) {
+void DmaInstance::setupTxDescFirst(uint32_t tx_address, uint8_t* buf, uint32_t len) {
+  setupTxDescAny(ch_desc, tx_address, buf, len);
+}
+
+void DmaInstance::setupTxDescAny(DmacDescriptor* desc, uint32_t tx_address, uint8_t* buf, uint32_t len) {
   // initialize descriptor data
-  ch_desc->BTCNT.reg = 0;
-  ch_desc->BTCTRL.reg = 0;
+  desc->BTCNT.reg = 0;
+  desc->BTCTRL.reg = 0;
   // Set descriptor for TX
   DMAC_BTCTRL_Type btctrl;
   btctrl.reg = 0;
@@ -74,18 +78,22 @@ void DmaInstance::setupTxDesc(uint32_t tx_address, uint8_t* buf, uint32_t len) {
   btctrl.bit.DSTINC = 0;  // writes to fixed sercom->DATA address
   btctrl.bit.STEPSEL = DMAC_BTCTRL_STEPSEL_SRC_Val;
   btctrl.bit.STEPSIZE = DMAC_BTCTRL_STEPSIZE_X1_Val;
-  ch_desc->BTCTRL.reg = btctrl.reg;
+  desc->BTCTRL.reg = btctrl.reg;
   /* Set transfer size, source address and destination address */
-  ch_desc->BTCNT.reg = len;
-  ch_desc->SRCADDR.reg = reinterpret_cast<uint32_t>(buf) + static_cast<uint32_t>(len);
-  ch_desc->DSTADDR.reg = tx_address;
-  ch_desc->DESCADDR.reg = 0;
+  desc->BTCNT.reg = len;
+  desc->SRCADDR.reg = reinterpret_cast<uint32_t>(buf) + static_cast<uint32_t>(len);
+  desc->DSTADDR.reg = tx_address;
+  desc->DESCADDR.reg = 0;
 }
 
-void DmaInstance::setupRxDesc(uint32_t rx_address, uint8_t* buf, uint32_t len) {
+void DmaInstance::setupRxDescFirst(uint32_t rx_address, uint8_t* buf, uint32_t len) {
+  setupRxDescAny(ch_desc, rx_address, buf, len);
+}
+
+void DmaInstance::setupRxDescAny(DmacDescriptor* desc, uint32_t rx_address, uint8_t* buf, uint32_t len) {
   // initialize descriptor data
-  ch_desc->BTCNT.reg = 0;
-  ch_desc->BTCTRL.reg = 0;
+  desc->BTCNT.reg = 0;
+  desc->BTCTRL.reg = 0;
   // Set descriptor for TX
   DMAC_BTCTRL_Type btctrl;
   btctrl.reg = 0;
@@ -97,12 +105,12 @@ void DmaInstance::setupRxDesc(uint32_t rx_address, uint8_t* buf, uint32_t len) {
   btctrl.bit.DSTINC = 1;  // writes to fixed sercom->DATA address
   btctrl.bit.STEPSEL = DMAC_BTCTRL_STEPSEL_DST_Val;
   btctrl.bit.STEPSIZE = DMAC_BTCTRL_STEPSIZE_X1_Val;
-  ch_desc->BTCTRL.reg = btctrl.reg;
+  desc->BTCTRL.reg = btctrl.reg;
   /* Set transfer size, source address and destination address */
-  ch_desc->BTCNT.reg = len;
-  ch_desc->SRCADDR.reg = rx_address;
-  ch_desc->DSTADDR.reg = reinterpret_cast<uint32_t>(buf) + static_cast<uint32_t>(len);
-  ch_desc->DESCADDR.reg = 0;
+  desc->BTCNT.reg = len;
+  desc->SRCADDR.reg = rx_address;
+  desc->DSTADDR.reg = reinterpret_cast<uint32_t>(buf) + static_cast<uint32_t>(len);
+  desc->DESCADDR.reg = 0;
 }
 
 void DmaInstance::start() {

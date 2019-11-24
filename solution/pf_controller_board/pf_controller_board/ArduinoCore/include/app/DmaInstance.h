@@ -25,10 +25,16 @@ class DmaInstance {
   void setupRxConfig(uint8_t sercom_id);
   
   // Descriptor configuration for Sercom Tx
-  void setupTxDesc(uint32_t tx_address, uint8_t* tx_buf, uint32_t len);
+  void setupTxDescFirst(uint32_t tx_address, uint8_t* tx_buf, uint32_t len);
   
   // Descriptor configuration for Sercom Rx
-  void setupRxDesc(uint32_t rx_address, uint8_t* rx_buf, uint32_t len);
+  void setupRxDescFirst(uint32_t rx_address, uint8_t* rx_buf, uint32_t len);
+  
+  // Descriptor configuration for Sercom Tx
+  void setupTxDescAny(DmacDescriptor* desc, uint32_t tx_address, uint8_t* tx_buf, uint32_t len);
+  
+  // Descriptor configuration for Sercom Rx
+  void setupRxDescAny(DmacDescriptor* desc, uint32_t rx_address, uint8_t* rx_buf, uint32_t len);
   
   // Start dmac channel
   void start();

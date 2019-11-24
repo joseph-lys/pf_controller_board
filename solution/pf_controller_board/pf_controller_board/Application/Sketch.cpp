@@ -35,6 +35,15 @@ void loop() {
       SerialUSB.write(static_cast<uint8_t>(x));
     }
   }
+  if (Serial.available()) {
+    SerialUSB.println("FROM DMA RX!");
+  }
+  while(Serial.available()) {
+    x = Serial.read();
+    if(x > 0) {
+      SerialUSB.write(static_cast<uint8_t>(x));
+    }
+  }
   digitalWrite(LED_PIN, HIGH);
   delay(1000);
   digitalWrite(LED_PIN, LOW);
@@ -44,8 +53,10 @@ void loop() {
   Pm* pm = PM;
   Sercom* sercom = SERCOM2;
   Dmac* dmac = DMAC;
-  DmacDescriptor* first = Dma::firstDesc(0);
-  DmacDescriptor* working = Dma::workingDesc(0);
+  DmacDescriptor* first_rx = Dma::firstDesc(0);
+  DmacDescriptor* working_rx = Dma::workingDesc(0);
+  DmacDescriptor* first_tx = Dma::firstDesc(1);
+  DmacDescriptor* working_tx = Dma::workingDesc(1);
   
   Serial.write(dma_test, sizeof(dma_test));
   

@@ -12,49 +12,97 @@
 #include "XSERCOM.h"
 #include "DmaInstance.h"
 #include "callback.h"
-class DmaUart : public Callback {
-  public:
-    enum {
-      is_busy,
-      is_done,
-      is_timeout
-    };
-    DmaUart(XSERCOM *_s, uint8_t _dma_channel, uint8_t _pinRX, uint8_t _pinTX, SercomRXPad _padRX, SercomUartTXPad _padTX);
-    
-    // configure UART to specified settings
-    void begin(unsigned long baudrate);
-    void begin(unsigned long baudrate, uint16_t config);
-    
-    // write to uart
-    void write(uint8_t* _tx_buf, uint32_t _tx_len);
-    
-    // read from uart
-    void read(uint8_t* _tx_buf, uint32_t _tx_len);
 
-    // returns the current state
-    int poll();
-    
-    // stop transfer
-    void stopTransfer();
-    
-    // callback function
-    void callback (int) override final;
-    
-  private:
-    XSERCOM* sercom;
-    DmaInstance dma_;
-    uint8_t dma_channel;
-    uint8_t uc_pinRX;
-    uint8_t uc_pinTX;
-    SercomRXPad uc_padRX;
-    SercomUartTXPad uc_padTX;
-    
-    int current_state;
-    void init();
-    SercomNumberStopBit extractNbStopBit(uint16_t config);
-    SercomUartCharSize extractCharSize(uint16_t config);
-    SercomParityMode extractParity(uint16_t config);
+// use DMA to continuously read data
+class DmaContinuousReader : public Callback {
+ public:
+  explicit DmaContinuousReader(uint8_t _dma_channel, uint32_t rx_source_address);
+  void callback(int) override;
+  int readByte();
+  uint32_t available();
+  void start();
+  void stop();
+ protected:
+  enum : uint32_t {
+    block_shift = 5, // 32 bytes per block
+    block_data_size = uint32_t(1) << block_shift,
+    block_data_mask = block_data_size - 1,
+    num_blocks = 4, // 4 blocks
+    num_blocks_mask = num_blocks - 1,
+    buffer_size = block_data_size * num_blocks,
+    buffer_index_mask = buffer_size - 1
+  };
+  DmacDescriptor descriptors[num_blocks - 1]  __attribute__((__aligned__(16)));
+  DmaInstance dma_;
+  const uint32_t rx_source_address;
+  uint32_t read_; // number of bytes read
+  uint32_t write_;  // number of bytes written
+  uint32_t work_idx_;  // working buffer index
+  volatile uint8_t buffer_[buffer_size];
+  const uint8_t dma_channel;
+  uint32_t getWrittenCount();
+  void setup();
 };
+
+// Use DMA to transmit a single transaction
+class DmaOneOffWriter : public Callback {
+ public:
+  explicit DmaOneOffWriter(uint8_t _dma_channel, uint32_t rx_source_addres);
+  Callback* post_transfer_callback;
+  // begin a single write transaction
+  void write(uint8_t* _tx_buf, uint32_t _tx_len);
+  
+  // terminate any active transactions
+  void stopTransfer();
+  
+  // check if transfer is busy
+  bool isBusy();
+  
+  void callback(int) override;
+  
+ protected:
+  DmaInstance dma_;
+  const uint32_t tx_source_address;
+  const uint8_t dma_channel;
+  bool is_busy;
+};   
+
+class DmaUart {
+ public:
+  DmaUart(XSERCOM *_s, uint8_t _rx_dma_channel, uint8_t _tx_dma_channel, uint8_t _pinRX, uint8_t _pinTX, SercomRXPad _padRX, SercomUartTXPad _padTX);
+  DmaContinuousReader reader;
+  DmaOneOffWriter writer;
+  
+  // configure UART to specified settings
+  void begin(unsigned long baudrate);
+  void begin(unsigned long baudrate, uint16_t config);
+    
+  // write to uart
+  void write(uint8_t* _tx_buf, uint32_t _tx_len);
+
+  // transmission is in progress
+  bool isTransmitting();
+    
+  // terminate any existing transmits
+  void stopTransmit();
+  
+  int available();
+  
+  int read();
+        
+ private:
+  XSERCOM* sercom;
+  uint8_t uc_pinRX;
+  uint8_t uc_pinTX;
+  SercomRXPad uc_padRX;
+  SercomUartTXPad uc_padTX;    
+   
+  void init();
+  SercomNumberStopBit extractNbStopBit(uint16_t config);
+  SercomUartCharSize extractCharSize(uint16_t config);
+  SercomParityMode extractParity(uint16_t config);
+};
+
 
 
 
