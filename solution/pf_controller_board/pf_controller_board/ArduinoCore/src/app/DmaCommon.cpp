@@ -53,20 +53,16 @@ uint8_t Dma::getSercomRx(uint8_t sercom_id) {
 }
 
 void Dma::irqHandler() {
-  uint32_t i;
   uint32_t int_flag;
   Dmac* dmac = DMAC;
-  const uint32_t chint = dmac->INTSTATUS.vec.CHINT;
-  
-  for(i = 0; i < DMA_MAX_CHANNELS_USED; i++) {
-    if(chint & (1ul << i)) {
-      __disable_irq();
-      dmac->CHID.bit.ID = i;
-      int_flag = dmac->CHINTFLAG.reg;
-      __enable_irq();
-      channel_callbacks[i]->callback(int_flag);
-    }
-  }
+  uint32_t id = dmac->INTPEND.bit.ID;
+  __disable_irq();
+  dmac->CHID.bit.ID = id;
+  int_flag = dmac->CHINTFLAG.reg;
+  dmac->CHINTFLAG.reg = int_flag;
+  __enable_irq();
+  dmac->INTPEND.bit.ID = 11;  // id can only go downwards, set to highest
+  channel_callbacks[id]->callback(int_flag);
 }
 
 void Dma::swTrigger(uint8_t channel){

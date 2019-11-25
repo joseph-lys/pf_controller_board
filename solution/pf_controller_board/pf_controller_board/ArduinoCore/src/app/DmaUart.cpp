@@ -12,6 +12,7 @@
 #include "HardwareSerial.h"
 #include "wiring_private.h"
 #include "DmaCommon.h"
+#include "limits.h"
 
 DmaContinuousReader::DmaContinuousReader(uint8_t _dma_channel, XSERCOM* _sercom)
 : dma_(_dma_channel, this), sercom(_sercom), 
@@ -21,11 +22,11 @@ dma_channel(_dma_channel){
 
 void DmaContinuousReader::callback(int) {
   uint32_t read_block_idx;
-  write_ = write_ + block_data_size;
-  work_idx_ = (work_idx_ + 1) & num_blocks_mask;
   
   // push read counter out of current block
   __disable_irq();
+  write_ += block_data_size;
+  work_idx_ = (work_idx_ + 1) & num_blocks_mask;
   read_block_idx =  (read_ >> block_shift) & num_blocks_mask;
   if (read_block_idx == work_idx_) {
     read_ = (read_ & ~block_data_mask) + block_data_size;
@@ -35,18 +36,31 @@ void DmaContinuousReader::callback(int) {
 
 int DmaContinuousReader::readByte() {
   int val;
-  if (read_ == getWrittenCount()) {
-    val = -1;
-    } else {
-    val = buffer_[read_ & buffer_index_mask];
+  uint32_t read;
+  __disable_irq();
+  read = read_;
+  __enable_irq();
+  if (available()) {
+    val = buffer_[read & buffer_index_mask];
+    __disable_irq();
     read_++;
+    __enable_irq();
+  } else {
+    val = -1;
   }
   return val;
 }
 
 uint32_t DmaContinuousReader::available() {
-  uint32_t diff = getWrittenCount() - read_;
-  if (diff > buffer_size) {
+  uint32_t diff;
+  uint32_t read;
+  __disable_irq();
+  read = read_;
+  diff = getWrittenCount();
+  diff -= read;
+  __enable_irq();
+  
+  if (diff > 0x7FFFFFFF) {
     diff = 0;
   }
   return diff;
@@ -58,6 +72,7 @@ void DmaContinuousReader::start() {
   write_ = 0;
   work_idx_ = 0;
   setup();
+  dma_.setupRxConfig(sercom->getSercomId());
   dma_.start();
 }
 
@@ -67,8 +82,12 @@ void DmaContinuousReader::stop() {
 
 
 uint32_t DmaContinuousReader::getWrittenCount() {
-  uint32_t working_remaining = Dma::workingDesc(dma_channel)->BTCNT.reg;
-  return write_ + (block_data_size - working_remaining);
+  uint32_t write, working_remaining;
+  __disable_irq();
+  write = write_;
+  working_remaining = Dma::workingDesc(dma_channel)->BTCNT.reg;
+  __enable_irq();
+  return write + (block_data_size - working_remaining);
 }
 
 void DmaContinuousReader::setup(){
@@ -79,7 +98,7 @@ void DmaContinuousReader::setup(){
   // setup descriptor information
   dma_.setupRxDescFirst(rx_source_address, const_cast<uint8_t*>(buffer_), block_data_size);
   for(int i=0; i<num_blocks - 1; i++) {
-    dma_.setupRxDescAny(&(descriptors[i]), rx_source_address, const_cast<uint8_t*>(&buffer_[i * block_data_size]), block_data_size);
+    dma_.setupRxDescAny(&(descriptors[i]), rx_source_address, const_cast<uint8_t*>(&buffer_[(i + 1) * block_data_size]), block_data_size);
   }
   // link all descriptors
   dma_.ch_desc->DESCADDR.reg = reinterpret_cast<uint32_t>(&(descriptors[1]));

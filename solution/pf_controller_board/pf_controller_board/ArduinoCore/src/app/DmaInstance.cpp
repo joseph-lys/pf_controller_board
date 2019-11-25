@@ -72,7 +72,7 @@ void DmaInstance::setupTxDescAny(DmacDescriptor* desc, uint32_t tx_address, uint
   btctrl.reg = 0;
   btctrl.bit.VALID = 1;
   btctrl.bit.EVOSEL = DMAC_BTCTRL_EVOSEL_DISABLE_Val;
-  btctrl.bit.BLOCKACT = DMAC_BTCTRL_BLOCKACT_NOACT_Val;
+  btctrl.bit.BLOCKACT = DMAC_BTCTRL_BLOCKACT_INT_Val;
   btctrl.bit.BEATSIZE = DMAC_BTCTRL_BEATSIZE_BYTE_Val;
   btctrl.bit.SRCINC = 1;
   btctrl.bit.DSTINC = 0;  // writes to fixed sercom->DATA address
@@ -99,7 +99,7 @@ void DmaInstance::setupRxDescAny(DmacDescriptor* desc, uint32_t rx_address, uint
   btctrl.reg = 0;
   btctrl.bit.VALID = 1;
   btctrl.bit.EVOSEL = DMAC_BTCTRL_EVOSEL_DISABLE_Val;
-  btctrl.bit.BLOCKACT = DMAC_BTCTRL_BLOCKACT_NOACT_Val;
+  btctrl.bit.BLOCKACT = DMAC_BTCTRL_BLOCKACT_INT_Val;
   btctrl.bit.BEATSIZE = DMAC_BTCTRL_BEATSIZE_BYTE_Val;
   btctrl.bit.SRCINC = 0;
   btctrl.bit.DSTINC = 1;  // writes to fixed sercom->DATA address

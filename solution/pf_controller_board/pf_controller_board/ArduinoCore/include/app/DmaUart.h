@@ -40,7 +40,7 @@ class DmaContinuousReader : public Callback {
   volatile uint32_t work_idx_;  // working buffer index
   volatile uint8_t buffer_[buffer_size];
   const uint8_t dma_channel;
-  uint32_t getWrittenCount();
+  inline uint32_t getWrittenCount();
   void setup();
 };
 
