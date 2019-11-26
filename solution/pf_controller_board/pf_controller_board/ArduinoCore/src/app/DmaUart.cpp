@@ -21,27 +21,36 @@ dma_channel(_dma_channel){
 }
 
 void DmaContinuousReader::callback(int) {
-  uint32_t read_block_idx;
+  volatile uint32_t read_block_idx;
   
   // push read counter out of current block
   __disable_irq();
-  write_ += block_data_size;
   work_idx_ = (work_idx_ + 1) & num_blocks_mask;
   read_block_idx =  (read_ >> block_shift) & num_blocks_mask;
   if (read_block_idx == work_idx_) {
     read_ = (read_ & ~block_data_mask) + block_data_size;
   }
+  write_ += block_data_size;
   __enable_irq();
 }
 
 int DmaContinuousReader::readByte() {
   int val;
-  uint32_t read;
+  uint32_t read, write, work_idx, diff;
   __disable_irq();
   read = read_;
+  write = write_;
+  work_idx = work_idx_;
   __enable_irq();
-  if (available()) {
-    val = buffer_[read & buffer_index_mask];
+  
+  diff = write - read; 
+  if(diff < 0x7FFFFFFF && diff > 0) {
+    val = static_cast<int>(buffer_[read & buffer_index_mask]);
+    __disable_irq();
+    read_++;
+    __enable_irq();
+  } else if(available()) {
+    val = static_cast<int>(buffer_[read & buffer_index_mask]);
     __disable_irq();
     read_++;
     __enable_irq();
@@ -54,11 +63,10 @@ int DmaContinuousReader::readByte() {
 uint32_t DmaContinuousReader::available() {
   uint32_t diff;
   uint32_t read;
-  __disable_irq();
+  
   read = read_;
   diff = getWrittenCount();
   diff -= read;
-  __enable_irq();
   
   if (diff > 0x7FFFFFFF) {
     diff = 0;
@@ -82,11 +90,21 @@ void DmaContinuousReader::stop() {
 
 
 uint32_t DmaContinuousReader::getWrittenCount() {
-  uint32_t write, working_remaining;
-  __disable_irq();
-  write = write_;
-  working_remaining = Dma::workingDesc(dma_channel)->BTCNT.reg;
-  __enable_irq();
+  volatile uint32_t write, working_remaining, next_addr;
+  DmacDescriptor* volatile desc = Dma::workingDesc(dma_channel);
+  // do {
+  //  next_addr = desc->DSTADDR.reg;
+  //  write = write_;
+  //  working_remaining = desc->BTCNT.reg;
+  // } while(working_remaining != desc->BTCNT.reg || write != write_ || next_addr != desc->DSTADDR.reg || dma_.isPending());
+  do {
+    next_addr = desc->DSTADDR.reg;
+    working_remaining = desc->BTCNT.reg;
+    write = write_;
+  } while(working_remaining != desc->BTCNT.reg || next_addr != desc->DSTADDR.reg);
+  if(working_remaining < 1) {
+    working_remaining = 1;
+  }
   return write + (block_data_size - working_remaining);
 }
 
@@ -101,7 +119,7 @@ void DmaContinuousReader::setup(){
     dma_.setupRxDescAny(&(descriptors[i]), rx_source_address, const_cast<uint8_t*>(&buffer_[(i + 1) * block_data_size]), block_data_size);
   }
   // link all descriptors
-  dma_.ch_desc->DESCADDR.reg = reinterpret_cast<uint32_t>(&(descriptors[1]));
+  dma_.ch_desc->DESCADDR.reg = reinterpret_cast<uint32_t>(&(descriptors[0]));
   for(int i=0; i<num_blocks - 2; i++) {
     descriptors[i].DESCADDR.reg = reinterpret_cast<uint32_t>(&(descriptors[i + 1]));
   }

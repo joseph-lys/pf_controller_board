@@ -14,28 +14,20 @@ void setup() {
   Dma::init();
   /// Additional configuration for SERCOM 2 as UART
   SerialUSB.begin(1000000);
-  Serial1.begin(1000000);
-  Serial.begin(1000000);
+  Serial1.begin(9600);
+  Serial.begin(9600);
   //RX: D3 (PA09), TX: D4 (PA08)
   pinPeripheral(3, PIO_SERCOM_ALT);
   pinPeripheral(4, PIO_SERCOM_ALT);
   pinMode(LED_PIN, OUTPUT);
   delay(3000);
 }
-
+uint8_t serial_test[] = "abcde";
 uint8_t dma_test[] = "dmatestload\n";
 void loop() {
   // put your main code here, to run repeatedly:
-  int x;
-  
-  while(Serial.available()) {
-    x = Serial.read();
-    if(x > 0) {
-      SerialUSB.write(static_cast<uint8_t>(x));
-      delay(1);
-    }
-  }
-  delay(1);
+  volatile int x;
+  delay(500);
   SerialUSB.println("USBTESTLOAD");
   delay(1);
   while(Serial1.available()) {
@@ -48,7 +40,7 @@ void loop() {
   digitalWrite(LED_PIN, HIGH);
   delay(1000);
   digitalWrite(LED_PIN, LOW);
-  Serial1.println("serialtestload\n");
+  Serial1.write(serial_test, sizeof(serial_test));
   Serial.write(dma_test, sizeof(dma_test));
   /// Debug configurations
   Pm* pm = PM;
@@ -59,6 +51,23 @@ void loop() {
   DmacDescriptor* first_tx = Dma::firstDesc(0);
   DmacDescriptor* working_tx = Dma::workingDesc(0);
   
-  
-  delay(1000);
+  while(Serial.available()) {
+    x = Serial.read();
+    if(x >= 0) {
+      SerialUSB.write(static_cast<uint8_t>(x));
+      SerialUSB.println(x);
+    } else {
+      x++;
+    }
+  }
+  delay(200);
+  while(Serial.available()) {
+    x = Serial.read();
+    if(x >= 0) {
+      SerialUSB.write(static_cast<uint8_t>(x));
+      SerialUSB.println(x);
+    } else {
+      x++;
+    }
+  }
 }

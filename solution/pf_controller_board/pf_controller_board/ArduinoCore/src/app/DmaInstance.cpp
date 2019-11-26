@@ -137,3 +137,8 @@ void DmaInstance::stop() {
   while(0 != dmac->CHCTRLA.bit.SWRST) {}  // wait for reset
   __enable_irq();
 }
+
+bool DmaInstance::isPending() {
+  Dmac* dmac = DMAC;  
+  return static_cast<bool>(dmac->PENDCH.vec.PENDCH & (uint32_t(1) << dma_channel));
+}

@@ -41,6 +41,9 @@ class DmaInstance {
   
   // Stop dmac channel
   void stop();
+  
+  // returns channel's pending flag
+  bool isPending();
 };
 
 
