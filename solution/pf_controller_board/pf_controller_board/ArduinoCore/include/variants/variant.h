@@ -192,7 +192,7 @@ extern SERCOM sercom0;
 extern SERCOM sercom1;
 extern XSERCOM sercom2;
 extern SERCOM sercom3;
-extern SERCOM sercom4;
+extern XSERCOM sercom4;
 extern SERCOM sercom5;
 
 extern DmaUart Serial;

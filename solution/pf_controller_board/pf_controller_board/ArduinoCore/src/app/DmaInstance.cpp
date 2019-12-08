@@ -9,13 +9,19 @@
 #include "DmaInstance.h"
 
 DmaInstance::DmaInstance(uint8_t _dma_channel, Callback* callback_instance)
-: dma_channel(_dma_channel), ch_desc(Dma::firstDesc(_dma_channel)) {
-  Dma::registerChannel(dma_channel, callback_instance);
+: dma_channel(_dma_channel), ch_desc(Dma::firstDesc(_dma_channel)), _has_callback(callback_instance != nullptr) {
+  if (_has_callback) {
+    Dma::registerChannel(dma_channel, callback_instance);
+  }
 }
 
 DmaInstance::~DmaInstance() {}
 
 void DmaInstance::setupTxConfig(uint8_t sercom_id) {
+  setupTxConfig(sercom_id, 1);  // use default priority 1
+}
+
+void DmaInstance::setupTxConfig(uint8_t sercom_id, uint32_t priority) {
   Dmac* dmac = DMAC;
   
   // set configurations
@@ -24,20 +30,29 @@ void DmaInstance::setupTxConfig(uint8_t sercom_id) {
   ch_ctrl_b.bit.EVACT = DMAC_CHCTRLB_EVACT_NOACT_Val;
   ch_ctrl_b.bit.EVIE = 0;  // no input event
   ch_ctrl_b.bit.EVOE = 0;  // no output event
-  ch_ctrl_b.bit.LVL = DMAC_CHCTRLB_LVL_LVL1_Val;  // reserve one level for SPI
+  ch_ctrl_b.bit.LVL = priority;  // reserve one level for SPI
   ch_ctrl_b.bit.TRIGSRC = Dma::getSercomTx(sercom_id);
   ch_ctrl_b.bit.TRIGACT = DMAC_CHCTRLB_TRIGACT_BEAT_Val;  //
   
   __disable_irq();
   dmac->CHID.bit.ID = dma_channel;
   dmac->CHCTRLB.reg = ch_ctrl_b.reg;
-  dmac->CHINTENSET.bit.TCMPL = 1;
-  dmac->CHINTENSET.bit.TERR = 1;
+  if (_has_callback) {
+    dmac->CHINTENSET.bit.TCMPL = 1;
+    dmac->CHINTENSET.bit.TERR = 1;    
+  } else {
+  dmac->CHINTENCLR.bit.TCMPL = 1;
+  dmac->CHINTENCLR.bit.TERR = 1;    
+  }
   dmac->CHINTENCLR.bit.SUSP = 1;
   __enable_irq();
 }
 
 void DmaInstance::setupRxConfig(uint8_t sercom_id) {
+  setupRxConfig(sercom_id, 1);  // use default priority 1
+}
+
+void DmaInstance::setupRxConfig(uint8_t sercom_id, uint32_t priority) {
   Dmac* dmac = DMAC;
   
   // set configurations
@@ -46,15 +61,20 @@ void DmaInstance::setupRxConfig(uint8_t sercom_id) {
   ch_ctrl_b.bit.EVACT = DMAC_CHCTRLB_EVACT_NOACT_Val;
   ch_ctrl_b.bit.EVIE = 0;  // no input event
   ch_ctrl_b.bit.EVOE = 0;  // no output event
-  ch_ctrl_b.bit.LVL = DMAC_CHCTRLB_LVL_LVL1_Val;  // reserve one level for SPI
+  ch_ctrl_b.bit.LVL = priority;  
   ch_ctrl_b.bit.TRIGSRC = Dma::getSercomRx(sercom_id);
   ch_ctrl_b.bit.TRIGACT = DMAC_CHCTRLB_TRIGACT_BEAT_Val;  //
   
   __disable_irq();
   dmac->CHID.bit.ID = dma_channel;
   dmac->CHCTRLB.reg = ch_ctrl_b.reg;
-  dmac->CHINTENSET.bit.TCMPL = 1;
-  dmac->CHINTENSET.bit.TERR = 1;
+  if (_has_callback) {
+    dmac->CHINTENSET.bit.TCMPL = 1;
+    dmac->CHINTENSET.bit.TERR = 1;
+  } else {
+    dmac->CHINTENCLR.bit.TCMPL = 1;
+    dmac->CHINTENCLR.bit.TERR = 1;
+  }
   dmac->CHINTENCLR.bit.SUSP = 1;
   __enable_irq();
 }
@@ -119,7 +139,9 @@ void DmaInstance::start() {
   // select DMA channel
   dmac->CHID.bit.ID = dma_channel;
   // enable interrupts
-  dmac->CHINTENSET.reg = DMAC_CHINTFLAG_TERR | DMAC_CHINTFLAG_TCMPL;
+  if (_has_callback) {
+    dmac->CHINTENSET.reg = DMAC_CHINTFLAG_TERR | DMAC_CHINTFLAG_TCMPL;  
+  }
   // enable dma
   dmac->CHCTRLA.bit.ENABLE = 1;
   __enable_irq();
@@ -136,6 +158,10 @@ void DmaInstance::stop() {
   dmac->CHCTRLA.bit.SWRST = 1;
   while(0 != dmac->CHCTRLA.bit.SWRST) {}  // wait for reset
   __enable_irq();
+}
+
+void DmaInstance::triggerBeat() {
+  Dma::swTrigger(dma_channel);
 }
 
 bool DmaInstance::isPending() {

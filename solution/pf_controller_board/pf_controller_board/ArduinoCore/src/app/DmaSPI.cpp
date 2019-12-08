@@ -17,7 +17,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "SPI.h"
+#include "DmaSPI.h"
 #include <Arduino.h>
 #include <wiring_private.h>
 #include <assert.h>
@@ -26,10 +26,79 @@
 #define SPI_IMODE_EXTINT 1
 #define SPI_IMODE_GLOBAL 2
 
-SPIClass::SPIClass(SERCOM *p_sercom, uint8_t uc_pinMISO, uint8_t uc_pinSCK, uint8_t uc_pinMOSI, SercomSpiTXPad PadTx, SercomRXPad PadRx) : settings(SPISettings(0, MSBFIRST, SPI_MODE0))
+#define SPI_BUFFER_SIZE 128
+
+template<typename T>
+void swap_ptrs(T& a, T& b) {
+  T temp = b;
+  b = a;
+  a = temp;
+}
+
+static void SPISlaveEquivalentPad(SercomSpiTXSlavePad& new_tx_pad, SercomSpiRXSlavePad& new_rx_pad, SercomSpiTXPad original_txpad, SercomRXPad original_rxpad) {
+  int mosi_pad, miso_pad, sck_pad;
+  switch(original_txpad) {
+    case 	SPI_PAD_0_SCK_1:
+        mosi_pad = 0;
+        sck_pad = 1;
+      break;
+	  case SPI_PAD_2_SCK_3:
+        mosi_pad = 2;
+        sck_pad = 3;
+      break;
+	  case SPI_PAD_3_SCK_1:
+        mosi_pad = 3;
+        sck_pad = 1;
+      break;
+	  case SPI_PAD_0_SCK_3:
+        mosi_pad = 0;
+        sck_pad = 3;
+      break;
+    default:
+      assert("Unknown pad");
+  }
+  miso_pad = static_cast<int>(original_rxpad);
+  if (miso_pad == 0 && sck_pad == 1) {
+    new_tx_pad = SPI_SLAVE_PAD_0_SCK_1;
+  } else if (miso_pad == 2 && sck_pad == 3) {
+    new_tx_pad = SPI_SLAVE_PAD_2_SCK_3;
+  } else if (miso_pad == 3 && sck_pad == 1) {
+    new_tx_pad = SPI_SLAVE_PAD_3_SCK_1;
+  } else if (miso_pad == 0 && sck_pad == 3) {
+    new_tx_pad = SPI_SLAVE_PAD_0_SCK_3;
+  } else {
+    assert("No possible conversion from SPI master MOSI, MISO, SCK to Slave equivalent, you need to define your own pad");
+  }
+  new_rx_pad = static_cast<SercomSpiRXSlavePad>(mosi_pad);
+}
+
+static SercomSpiTXSlavePad SPISlaveEquivalentTxPad(SercomSpiTXPad original_txpad, SercomRXPad original_rxpad) {
+  SercomSpiTXSlavePad new_tx_pad;
+  SercomSpiRXSlavePad new_rx_pad;
+  SPISlaveEquivalentPad(new_tx_pad, new_rx_pad, original_txpad, original_rxpad);
+  return new_tx_pad;
+}
+
+static SercomSpiRXSlavePad SPISlaveEquivalentRxPad(SercomSpiTXPad original_txpad, SercomRXPad original_rxpad) {
+  SercomSpiTXSlavePad new_tx_pad;
+  SercomSpiRXSlavePad new_rx_pad;
+  SPISlaveEquivalentPad(new_tx_pad, new_rx_pad, original_txpad, original_rxpad);
+  return new_rx_pad;
+}
+
+DmaSPISlaveClass::DmaSPISlaveClass(XSERCOM *p_sercom,uint8_t dma_rx_channel, uint8_t dma_tx_channel, uint8_t uc_pinMISO, uint8_t uc_pinSCK, uint8_t uc_pinMOSI, SercomSpiTXPad PadTx, SercomRXPad PadRx) 
+: 
+DmaSPISlaveClass::DmaSPISlaveClass(p_sercom, dma_rx_channel, dma_tx_channel, uc_pinMISO, uc_pinSCK, uc_pinMOSI,
+  SPISlaveEquivalentTxPad(PadTx, PadRx), SPISlaveEquivalentRxPad(PadTx, PadRx)) {}
+
+DmaSPISlaveClass::DmaSPISlaveClass(XSERCOM *p_sercom,uint8_t dma_rx_channel, uint8_t dma_tx_channel, uint8_t uc_pinMISO, uint8_t uc_pinSCK, uint8_t uc_pinMOSI, SercomSpiTXSlavePad PadTx, SercomSpiRXSlavePad PadRx) 
+: 
+settings(SPISettings(0, MSBFIRST, SPI_MODE0)),
+buffer_size(SPI_BUFFER_SIZE), dma_rx(dma_rx_channel, nullptr), dma_tx(dma_tx_channel, nullptr),
+_data_register(reinterpret_cast<uint32_t>(&p_sercom->getSercomPointer()->SPI.DATA.reg))
 {
   initialized = false;
-  assert(p_sercom != NULL);
+  assert(p_sercom != nullptr);
   _p_sercom = p_sercom;
 
   // pins
@@ -40,9 +109,24 @@ SPIClass::SPIClass(SERCOM *p_sercom, uint8_t uc_pinMISO, uint8_t uc_pinSCK, uint
   // SERCOM pads
   _padTx=PadTx;
   _padRx=PadRx;
+  
+  // initialize the buffer memory
+  _tw_buffer = new uint8_t[SPI_BUFFER_SIZE]{0};
+  _tx_buffer = new uint8_t[SPI_BUFFER_SIZE]{0};
+  _w_buffer = new uint8_t[SPI_BUFFER_SIZE]{0};
+  _rx_buffer = new uint8_t[SPI_BUFFER_SIZE]{0};
+  _rw_buffer = new uint8_t[SPI_BUFFER_SIZE]{0};
 }
 
-void SPIClass::begin()
+DmaSPISlaveClass::~DmaSPISlaveClass() {
+  delete[] _tw_buffer;
+  delete[] _tx_buffer;
+  delete[] _w_buffer;
+  delete[] _rx_buffer;
+  delete[] _rw_buffer;
+}
+
+void DmaSPISlaveClass::begin()
 {
   init();
 
@@ -51,119 +135,38 @@ void SPIClass::begin()
   pinPeripheral(_uc_pinSCK, g_APinDescription[_uc_pinSCK].ulPinType);
   pinPeripheral(_uc_pinMosi, g_APinDescription[_uc_pinMosi].ulPinType);
 
-  config(DEFAULT_SPI_SETTINGS);
+  config(settings);
+  
 }
 
-void SPIClass::init()
+void DmaSPISlaveClass::init()
 {
   if (initialized)
     return;
-  interruptMode = SPI_IMODE_NONE;
-  interruptSave = 0;
-  interruptMask = 0;
   initialized = true;
 }
 
-void SPIClass::config(SPISettings settings)
+void DmaSPISlaveClass::config(SPISettings settings)
 {
   if (this->settings != settings) {
     this->settings = settings;
     _p_sercom->disableSPI();
 
-    _p_sercom->initSPI(_padTx, _padRx, SPI_CHAR_SIZE_8_BITS, settings.bitOrder);
+    _p_sercom->initSPISlave(_padTx, _padRx, SPI_CHAR_SIZE_8_BITS, settings.bitOrder);
     _p_sercom->initSPIClock(settings.dataMode, settings.clockFreq);
 
     _p_sercom->enableSPI();
   }
 }
 
-void SPIClass::end()
+void DmaSPISlaveClass::end()
 {
   _p_sercom->resetSPI();
   initialized = false;
 }
 
-#ifndef interruptsStatus
-#define interruptsStatus() __interruptsStatus()
-static inline unsigned char __interruptsStatus(void) __attribute__((always_inline, unused));
-static inline unsigned char __interruptsStatus(void)
-{
-  // See http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0497a/CHDBIBGJ.html
-  return (__get_PRIMASK() ? 0 : 1);
-}
-#endif
 
-void SPIClass::usingInterrupt(int interruptNumber)
-{
-  if ((interruptNumber == NOT_AN_INTERRUPT) || (interruptNumber == EXTERNAL_INT_NMI))
-    return;
-
-  uint8_t irestore = interruptsStatus();
-  noInterrupts();
-
-  if (interruptNumber >= EXTERNAL_NUM_INTERRUPTS)
-    interruptMode = SPI_IMODE_GLOBAL;
-  else
-  {
-    interruptMode |= SPI_IMODE_EXTINT;
-    interruptMask |= (1 << g_APinDescription[interruptNumber].ulExtInt);
-  }
-
-  if (irestore)
-    interrupts();
-}
-
-void SPIClass::notUsingInterrupt(int interruptNumber)
-{
-  if ((interruptNumber == NOT_AN_INTERRUPT) || (interruptNumber == EXTERNAL_INT_NMI))
-    return;
-
-  if (interruptMode & SPI_IMODE_GLOBAL)
-    return; // can't go back, as there is no reference count
-
-  uint8_t irestore = interruptsStatus();
-  noInterrupts();
-
-  interruptMask &= ~(1 << g_APinDescription[interruptNumber].ulExtInt);
-
-  if (interruptMask == 0)
-    interruptMode = SPI_IMODE_NONE;
-
-  if (irestore)
-    interrupts();
-}
-
-void SPIClass::beginTransaction(SPISettings settings)
-{
-  if (interruptMode != SPI_IMODE_NONE)
-  {
-    if (interruptMode & SPI_IMODE_GLOBAL)
-    {
-      interruptSave = interruptsStatus();
-      noInterrupts();
-    }
-    else if (interruptMode & SPI_IMODE_EXTINT)
-      EIC->INTENCLR.reg = EIC_INTENCLR_EXTINT(interruptMask);
-  }
-
-  config(settings);
-}
-
-void SPIClass::endTransaction(void)
-{
-  if (interruptMode != SPI_IMODE_NONE)
-  {
-    if (interruptMode & SPI_IMODE_GLOBAL)
-    {
-      if (interruptSave)
-        interrupts();
-    }
-    else if (interruptMode & SPI_IMODE_EXTINT)
-      EIC->INTENSET.reg = EIC_INTENSET_EXTINT(interruptMask);
-  }
-}
-
-void SPIClass::setBitOrder(BitOrder order)
+void DmaSPISlaveClass::setBitOrder(BitOrder order)
 {
   if (order == LSBFIRST) {
     _p_sercom->setDataOrderSPI(LSB_FIRST);
@@ -172,7 +175,7 @@ void SPIClass::setBitOrder(BitOrder order)
   }
 }
 
-void SPIClass::setDataMode(uint8_t mode)
+void DmaSPISlaveClass::setDataMode(uint8_t mode)
 {
   switch (mode)
   {
@@ -197,7 +200,7 @@ void SPIClass::setDataMode(uint8_t mode)
   }
 }
 
-void SPIClass::setClockDivider(uint8_t div)
+void DmaSPISlaveClass::setClockDivider(uint8_t div)
 {
   if (div < SPI_MIN_CLOCK_DIVIDER) {
     _p_sercom->setBaudrateSPI(SPI_MIN_CLOCK_DIVIDER);
@@ -206,74 +209,68 @@ void SPIClass::setClockDivider(uint8_t div)
   }
 }
 
-byte SPIClass::transfer(uint8_t data)
-{
-  return _p_sercom->transferDataSPI(data);
+uint8_t* DmaSPISlaveClass::getTxDataPtr() {
+  return const_cast<uint8_t*>(_tw_buffer);
 }
 
-uint16_t SPIClass::transfer16(uint16_t data) {
-  union { uint16_t val; struct { uint8_t lsb; uint8_t msb; }; } t;
+void DmaSPISlaveClass::queueTxData() {
+  __disable_irq();
+  _tx_pending = true;
+  swap_ptrs(_tw_buffer, _tx_buffer);
+  __enable_irq();
+}
+  
+uint8_t* DmaSPISlaveClass::getRxDataPtr() {
+  uint8_t* ptr = nullptr;
+  if(_rx_pending) {
+    __disable_irq();
+    if(_rx_pending) {
+      _rx_pending = false;
+      swap_ptrs(_rw_buffer, _rx_buffer);
+      ptr = const_cast<uint8_t*>(_rw_buffer);
+      _rx_pending = false;
+    }
+    __enable_irq();
+  }
+  return ptr;
+}
 
-  t.val = data;
-
-  if (_p_sercom->getDataOrderSPI() == LSB_FIRST) {
-    t.lsb = transfer(t.lsb);
-    t.msb = transfer(t.msb);
+void DmaSPISlaveClass::ssInterrupt(bool ss_state) {
+  auto sercom_id = _p_sercom->getSercomId();
+  if (!initialized) {
+    // do nothing, ignore the interrupt
+  } else if(ss_state) {
+    // HIGH indicates SS deselected, transfer completed
+    dma_tx.stop();
+    dma_rx.stop();
+    __disable_irq();
+    _rx_buffer[0] = 0;  // clear first byte, assume this will flag the buffer as empty
+    swap_ptrs(_w_buffer, _rx_buffer);
+    _rx_pending = true;
+    __enable_irq();
   } else {
-    t.msb = transfer(t.msb);
-    t.lsb = transfer(t.lsb);
+    dma_tx.stop();
+    dma_rx.stop();
+    // LOW indicates SS selected, prepare transfer
+    if (_tx_pending) {
+      __disable_irq();
+      if(_tx_pending) {  // recheck pending flag for data race
+        _w_buffer[0] = 0;  // clear first byte, assume this will flag the buffer as empty
+        swap_ptrs(_w_buffer, _tx_buffer);
+        _tx_pending = false;
+        __enable_irq();        
+      }
+    }      
+    dma_tx.setupTxConfig(sercom_id, 0);
+    dma_rx.setupRxConfig(sercom_id, 0);
+    dma_tx.setupTxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
+    dma_rx.setupRxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
+    dma_tx.start();
+    dma_rx.start();
+    dma_tx.triggerBeat();  // force one trigger to preload
   }
-
-  return t.val;
 }
 
-void SPIClass::transfer(void *buf, size_t count)
-{
-  uint8_t *buffer = reinterpret_cast<uint8_t *>(buf);
-  for (size_t i=0; i<count; i++) {
-    *buffer = transfer(*buffer);
-    buffer++;
-  }
-}
 
-void SPIClass::attachInterrupt() {
-  // Should be enableInterrupt()
-}
-
-void SPIClass::detachInterrupt() {
-  // Should be disableInterrupt()
-}
-
-#if SPI_INTERFACES_COUNT > 0
-  /* In case new variant doesn't define these macros,
-   * we put here the ones for Arduino Zero.
-   *
-   * These values should be different on some variants!
-   *
-   * The SPI PAD values can be found in cores/arduino/SERCOM.h:
-   *   - SercomSpiTXPad
-   *   - SercomRXPad
-   */
-  #ifndef PERIPH_SPI
-    #define PERIPH_SPI           sercom4
-    #define PAD_SPI_TX           SPI_PAD_2_SCK_3
-    #define PAD_SPI_RX           SERCOM_RX_PAD_0
-  #endif // PERIPH_SPI
-  SPIClass SPI (&PERIPH_SPI,  PIN_SPI_MISO,  PIN_SPI_SCK,  PIN_SPI_MOSI,  PAD_SPI_TX,  PAD_SPI_RX);
-#endif
-#if SPI_INTERFACES_COUNT > 1
-  SPIClass SPI1(&PERIPH_SPI1, PIN_SPI1_MISO, PIN_SPI1_SCK, PIN_SPI1_MOSI, PAD_SPI1_TX, PAD_SPI1_RX);
-#endif
-#if SPI_INTERFACES_COUNT > 2
-  SPIClass SPI2(&PERIPH_SPI2, PIN_SPI2_MISO, PIN_SPI2_SCK, PIN_SPI2_MOSI, PAD_SPI2_TX, PAD_SPI2_RX);
-#endif
-#if SPI_INTERFACES_COUNT > 3
-  SPIClass SPI3(&PERIPH_SPI3, PIN_SPI3_MISO, PIN_SPI3_SCK, PIN_SPI3_MOSI, PAD_SPI3_TX, PAD_SPI3_RX);
-#endif
-#if SPI_INTERFACES_COUNT > 4
-  SPIClass SPI4(&PERIPH_SPI4, PIN_SPI4_MISO, PIN_SPI4_SCK, PIN_SPI4_MOSI, PAD_SPI4_TX, PAD_SPI4_RX);
-#endif
-#if SPI_INTERFACES_COUNT > 5
-  SPIClass SPI5(&PERIPH_SPI5, PIN_SPI5_MISO, PIN_SPI5_SCK, PIN_SPI5_MOSI, PAD_SPI5_TX, PAD_SPI5_RX);
-#endif
-
+// DmaSPISlaveClass SPI (&PERIPH_SPI, 0, 1,  PIN_SPI_MISO,  PIN_SPI_SCK,  PIN_SPI_MOSI,  PAD_SPI_TX,  PAD_SPI_RX);
+DmaSPISlaveClass SPI (&PERIPH_SPI, 0, 1,  PIN_SPI_MISO,  PIN_SPI_SCK,  PIN_SPI_MOSI,  PAD_SPI_TX,  PAD_SPI_RX);

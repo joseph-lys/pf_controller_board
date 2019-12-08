@@ -20,9 +20,11 @@ class DmaInstance {
   
   // Channel configuration for Sercom Tx
   void setupTxConfig(uint8_t sercom_id);
+  void setupTxConfig(uint8_t sercom_id, uint32_t priority);
   
   // Channel configuration for Sercom Rx
   void setupRxConfig(uint8_t sercom_id);
+  void setupRxConfig(uint8_t sercom_id, uint32_t priority);
   
   // Descriptor configuration for Sercom Tx
   void setupTxDescFirst(uint32_t tx_address, uint8_t* tx_buf, uint32_t len);
@@ -42,8 +44,14 @@ class DmaInstance {
   // Stop dmac channel
   void stop();
   
+  // Trigger a beat
+  void triggerBeat();
+  
   // returns channel's pending flag
   bool isPending();
+  
+  private:
+  const bool _has_callback;
 };
 
 

@@ -271,6 +271,9 @@
     <Compile Include="include\app\DmaInstance.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="include\app\DmaSPI.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="include\app\DmaUart.h">
       <SubType>compile</SubType>
     </Compile>
@@ -677,6 +680,9 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\app\DmaInstance.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\app\DmaSPI.cpp">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\app\DmaUart.cpp">

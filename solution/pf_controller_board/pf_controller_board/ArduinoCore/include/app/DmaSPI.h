@@ -21,6 +21,7 @@
 #define _SPI_H_INCLUDED
 
 #include <Arduino.h>
+#include <DmaInstance.h>
 
 // SPI_HAS_TRANSACTION means SPI has
 //   - beginTransaction()
@@ -106,74 +107,70 @@ class SPISettings {
   SercomSpiClockMode dataMode;
   SercomDataOrder bitOrder;
 
-  friend class SPIClass;
+  friend class DmaSPISlaveClass;
 };
 
 const SPISettings DEFAULT_SPI_SETTINGS = SPISettings();
 
-class SPIClass {
+
+class DmaSPISlaveClass {
   public:
-  SPIClass(SERCOM *p_sercom, uint8_t uc_pinMISO, uint8_t uc_pinSCK, uint8_t uc_pinMOSI, SercomSpiTXPad, SercomRXPad);
-
-  byte transfer(uint8_t data);
-  uint16_t transfer16(uint16_t data);
-  void transfer(void *buf, size_t count);
-
-  // Transaction Functions
-  void usingInterrupt(int interruptNumber);
-  void notUsingInterrupt(int interruptNumber);
-  void beginTransaction(SPISettings settings);
-  void endTransaction(void);
-
-  // SPI Configuration methods
-  void attachInterrupt();
-  void detachInterrupt();
-
-  void begin();
-  void end();
-
+  DmaSPISlaveClass(XSERCOM *p_sercom, uint8_t dma_rx_channel, uint8_t dma_tx_channel, uint8_t uc_pinMISO, uint8_t uc_pinSCK, uint8_t uc_pinMOSI, SercomSpiTXPad, SercomRXPad);
+  DmaSPISlaveClass(XSERCOM *p_sercom, uint8_t dma_rx_channel, uint8_t dma_tx_channel, uint8_t uc_pinMISO, uint8_t uc_pinSCK, uint8_t uc_pinMOSI, SercomSpiTXSlavePad, SercomSpiRXSlavePad);
+  ~DmaSPISlaveClass();
+  const uint32_t buffer_size;
   void setBitOrder(BitOrder order);
   void setDataMode(uint8_t uc_mode);
   void setClockDivider(uint8_t uc_div);
-
+  void begin();
   private:
+  const uint32_t _data_register;
+  bool initialized;
+  volatile bool _tx_pending;
+  volatile bool _rx_pending;
+  volatile uint8_t* volatile _tw_buffer;
+  volatile uint8_t* volatile _tx_buffer;
+  volatile uint8_t* volatile _w_buffer;
+  volatile uint8_t* volatile _rx_buffer;
+  volatile uint8_t* volatile _rw_buffer;
+  
   void init();
   void config(SPISettings settings);
-
-  SERCOM *_p_sercom;
+  void end();
+  
+  XSERCOM *_p_sercom;
   uint8_t _uc_pinMiso;
   uint8_t _uc_pinMosi;
   uint8_t _uc_pinSCK;
 
-  SercomSpiTXPad _padTx;
-  SercomRXPad _padRx;
+  SercomSpiTXSlavePad _padTx;
+  SercomSpiRXSlavePad _padRx;
 
   SPISettings settings;
+  DmaInstance dma_rx;
+  DmaInstance dma_tx;
+    
+  public:
+  // this is called from within attached interrupt function
+  // interrupt should be triggered on CHANGE
+  // ss_state -> Low: Chip selected, dma channels are intialized for next transfer
+  //   
+  // ss_state -> High: Chip deselcted (transfer ended):
+  //   new data goes to pending_rx, 
+  //   pending_tx is cleared.
+  //   dma channels are stopped.
+  void ssInterrupt(bool ss_state);
 
-  bool initialized;
-  uint8_t interruptMode;
-  char interruptSave;
-  uint32_t interruptMask;
+  // get current TxDataPtr, data will not be queued for transfer until queueTxData is called
+  uint8_t* getTxDataPtr();
+  
+  // flag the current TxDataPtr as ready to transfer
+  void queueTxData();
+  
+  // get current RxDataPtr, if there is no pending RxData, returns a nullptr
+  uint8_t* getRxDataPtr();
+   
 };
-
-#if SPI_INTERFACES_COUNT > 0
-  extern SPIClass SPI;
-#endif
-#if SPI_INTERFACES_COUNT > 1
-  extern SPIClass SPI1;
-#endif
-#if SPI_INTERFACES_COUNT > 2
-  extern SPIClass SPI2;
-#endif
-#if SPI_INTERFACES_COUNT > 3
-  extern SPIClass SPI3;
-#endif
-#if SPI_INTERFACES_COUNT > 4
-  extern SPIClass SPI4;
-#endif
-#if SPI_INTERFACES_COUNT > 5
-  extern SPIClass SPI5;
-#endif
 
 // For compatibility with sketches designed for AVR @ 16 MHz
 // New programs should use SPI.beginTransaction to set the SPI clock
@@ -186,5 +183,8 @@ class SPIClass {
   #define SPI_CLOCK_DIV64  192
   #define SPI_CLOCK_DIV128 255
 #endif
+
+
+extern DmaSPISlaveClass SPI;
 
 #endif
