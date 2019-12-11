@@ -102,6 +102,12 @@ void Dma::init() {
   /// configure power management
   PM->AHBMASK.bit.DMAC_ = 1;
   
+  /// configure clock
+  GCLK->CLKCTRL.reg =  GCLK_CLKCTRL_ID_DAC| // Generic Clock 21 (DAC)
+                       GCLK_CLKCTRL_GEN_GCLK0 | // Generic Clock Generator 0 is source
+                       GCLK_CLKCTRL_CLKEN ;
+  while ( GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY ) {}  // Wait for sync
+     
   /// configure NVIC
   NVIC_EnableIRQ(DMAC_IRQn);
   NVIC_SetPriority(DMAC_IRQn, 1);

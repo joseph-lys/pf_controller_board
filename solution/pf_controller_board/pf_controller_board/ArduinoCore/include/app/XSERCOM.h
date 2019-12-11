@@ -13,10 +13,10 @@
 
 typedef enum
 {
-	SPI_SLAVE_PAD_0_SCK_1 = 0,
-	SPI_SLAVE_PAD_2_SCK_3,
-	SPI_SLAVE_PAD_3_SCK_1,
-	SPI_SLAVE_PAD_0_SCK_3
+	SPI_SLAVE_PAD_0_SCK_1_SS_2 = 0,
+	SPI_SLAVE_PAD_2_SCK_3_SS_1,
+	SPI_SLAVE_PAD_3_SCK_1_SS_2,
+	SPI_SLAVE_PAD_0_SCK_3_SS_1
 } SercomSpiTXSlavePad;
 
 typedef enum
@@ -33,8 +33,8 @@ public:
   uint8_t getSercomId();
   Sercom* getSercomPointer();
   void initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pad, SercomSpiCharSize charSize, SercomDataOrder dataOrder);
-  void initSPISlaveClock(SercomSpiClockMode clockMode, uint32_t baudrate);
-
+  void initSPISlaveClock(SercomSpiClockMode clockMode);
+  void clearSpiSslInterrupt();
 };
 
 

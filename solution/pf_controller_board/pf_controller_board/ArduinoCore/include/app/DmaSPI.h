@@ -115,13 +115,11 @@ const SPISettings DEFAULT_SPI_SETTINGS = SPISettings();
 
 class DmaSPISlaveClass {
   public:
-  DmaSPISlaveClass(XSERCOM *p_sercom, uint8_t dma_rx_channel, uint8_t dma_tx_channel, uint8_t uc_pinMISO, uint8_t uc_pinSCK, uint8_t uc_pinMOSI, SercomSpiTXPad, SercomRXPad);
-  DmaSPISlaveClass(XSERCOM *p_sercom, uint8_t dma_rx_channel, uint8_t dma_tx_channel, uint8_t uc_pinMISO, uint8_t uc_pinSCK, uint8_t uc_pinMOSI, SercomSpiTXSlavePad, SercomSpiRXSlavePad);
+  DmaSPISlaveClass(XSERCOM *p_sercom, uint8_t dma_rx_channel, uint8_t dma_tx_channel, uint8_t uc_pinMISO, uint8_t uc_pinSCK, uint8_t uc_pinMOSI, uint8_t uc_pinSS, SercomSpiTXSlavePad, SercomSpiRXSlavePad);
   ~DmaSPISlaveClass();
   const uint32_t buffer_size;
   void setBitOrder(BitOrder order);
   void setDataMode(uint8_t uc_mode);
-  void setClockDivider(uint8_t uc_div);
   void begin();
   private:
   const uint32_t _data_register;
@@ -131,7 +129,6 @@ class DmaSPISlaveClass {
   volatile uint8_t* volatile _tw_buffer;
   volatile uint8_t* volatile _tx_buffer;
   volatile uint8_t* volatile _w_buffer;
-  volatile uint8_t* volatile _rx_buffer;
   volatile uint8_t* volatile _rw_buffer;
   
   void init();
@@ -142,6 +139,7 @@ class DmaSPISlaveClass {
   uint8_t _uc_pinMiso;
   uint8_t _uc_pinMosi;
   uint8_t _uc_pinSCK;
+  uint8_t _uc_pinSS;
 
   SercomSpiTXSlavePad _padTx;
   SercomSpiRXSlavePad _padRx;
@@ -151,15 +149,11 @@ class DmaSPISlaveClass {
   DmaInstance dma_tx;
     
   public:
-  // this is called from within attached interrupt function
-  // interrupt should be triggered on CHANGE
-  // ss_state -> Low: Chip selected, dma channels are intialized for next transfer
-  //   
-  // ss_state -> High: Chip deselcted (transfer ended):
+  // this is called from within SERCOMX_Handler
   //   new data goes to pending_rx, 
   //   pending_tx is cleared.
   //   dma channels are stopped.
-  void ssInterrupt(bool ss_state);
+  void ssInterrupt();
 
   // get current TxDataPtr, data will not be queued for transfer until queueTxData is called
   uint8_t* getTxDataPtr();
@@ -171,18 +165,6 @@ class DmaSPISlaveClass {
   uint8_t* getRxDataPtr();
    
 };
-
-// For compatibility with sketches designed for AVR @ 16 MHz
-// New programs should use SPI.beginTransaction to set the SPI clock
-#if F_CPU == 48000000
-  #define SPI_CLOCK_DIV2   6
-  #define SPI_CLOCK_DIV4   12
-  #define SPI_CLOCK_DIV8   24
-  #define SPI_CLOCK_DIV16  48
-  #define SPI_CLOCK_DIV32  96
-  #define SPI_CLOCK_DIV64  192
-  #define SPI_CLOCK_DIV128 255
-#endif
 
 
 extern DmaSPISlaveClass SPI;

@@ -11,23 +11,23 @@
 
 #define LED_PIN 13
 
-void SPI_InterruptHandler(void) {
+void SERCOM4_Handler (void) {
+  
   // debugging stuff
   DmacDescriptor* first_rx = Dma::firstDesc(0);
   DmacDescriptor* working_rx = Dma::workingDesc(0);
   DmacDescriptor* first_tx = Dma::firstDesc(1);
   DmacDescriptor* working_tx = Dma::workingDesc(1);
   volatile int x = 0;
+
+  SPI.ssInterrupt();
+  return;
   
+  // move this to a seperate handler
+  bool ss_value = static_cast<bool>(digitalRead(LED_PIN));
   uint8_t* p_tx;
   uint8_t* p_rx;
-  bool ss_value = static_cast<bool>(digitalRead(LED_PIN));
-  if (ss_value) {
-    x--;
-  } else {
-    x--;
-  }
-  SPI.ssInterrupt(ss_value);
+
   if(ss_value) {
     p_tx = SPI.getTxDataPtr();
     p_rx = SPI.getRxDataPtr();
@@ -36,7 +36,6 @@ void SPI_InterruptHandler(void) {
         p_tx[i] = p_rx[i];
       }
     }
-    
     SPI.queueTxData();
   }
 }
@@ -48,18 +47,20 @@ void setup() {
   SerialUSB.begin(1000000);
   Serial1.begin(9600);
   Serial.begin(9600);
-  //RX: D3 (PA09), TX: D4 (PA08)
+  //Serial RX: D3 (PA09), TX: D4 (PA08)
   pinPeripheral(3, PIO_SERCOM_ALT);
   pinPeripheral(4, PIO_SERCOM_ALT);
+  //SPI 
   SPI.begin();
-  pinMode(LED_PIN, INPUT_PULLUP);
+  NVIC_DisableIRQ(SERCOM4_IRQn);
   delay(3000);
-  attachInterrupt(LED_PIN, SPI_InterruptHandler, CHANGE);
+  //attachInterrupt(SS, SPI_InterruptHandler, CHANGE);
 }
 
 uint8_t serial_test[] = "abcde";
 uint8_t dma_test[] = "dmatestload\n";
 void loop() {
+  volatile int x;
   /// Debug configurations
   Pm* pm = PM;
   Sercom* sercom = SERCOM2;
@@ -69,8 +70,41 @@ void loop() {
   DmacDescriptor* first_tx = Dma::firstDesc(1);
   DmacDescriptor* working_tx = Dma::workingDesc(1);
   
-  // put your main code here, to run repeatedly:
-  volatile int x;
+  // spi aggressive test loop
+  uint8_t* ptr_tx = nullptr;
+  uint8_t* ptr_rx = nullptr;
+  while(0) {
+    ptr_rx = SPI.getRxDataPtr();
+    if(ptr_rx) {
+      ptr_tx = SPI.getTxDataPtr();
+      for (int i=0; i<SPI.buffer_size; i++) {
+        ptr_tx[i] = ptr_rx[i];
+      }
+      SPI.queueTxData();
+    }
+  }
+  while(1) {
+    
+    SPI.ssInterrupt();
+    delay(5000);
+    x++;
+    delay(5000);
+    x++;
+    delay(5000);
+    x++;
+    delay(5000);
+    x++;
+    delay(5000);
+    x++;
+    delay(5000);
+    x++;
+    delay(5000);
+    x++;
+    delay(5000);
+    x++;
+    delay(5000);
+  }
+  
   delay(500);
   SerialUSB.println("USBTESTLOAD");
   delay(1);
