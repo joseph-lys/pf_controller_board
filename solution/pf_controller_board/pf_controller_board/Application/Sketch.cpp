@@ -52,9 +52,8 @@ void setup() {
   pinPeripheral(4, PIO_SERCOM_ALT);
   //SPI 
   SPI.begin();
-  NVIC_DisableIRQ(SERCOM4_IRQn);
-  delay(3000);
-  //attachInterrupt(SS, SPI_InterruptHandler, CHANGE);
+  // NVIC_DisableIRQ(SERCOM4_IRQn);
+  delay(500);
 }
 
 uint8_t serial_test[] = "abcde";
@@ -84,25 +83,14 @@ void loop() {
     }
   }
   while(1) {
-    
-    SPI.ssInterrupt();
+
+    //SPI.ssInterrupt();
     delay(5000);
     x++;
-    delay(5000);
+    delay(1);
     x++;
-    delay(5000);
+    delay(1);
     x++;
-    delay(5000);
-    x++;
-    delay(5000);
-    x++;
-    delay(5000);
-    x++;
-    delay(5000);
-    x++;
-    delay(5000);
-    x++;
-    delay(5000);
   }
   
   delay(500);

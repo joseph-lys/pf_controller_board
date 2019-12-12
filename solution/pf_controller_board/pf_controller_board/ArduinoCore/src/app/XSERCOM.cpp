@@ -107,7 +107,10 @@ void XSERCOM::initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pa
   sercom->SPI.CTRLB.reg = SERCOM_SPI_CTRLB_CHSIZE(charSize) | 
     SERCOM_SPI_CTRLB_RXEN | // Active the SPI receiver.
     SERCOM_SPI_CTRLB_SSDE ;	// Enable Slave Select Low Interrupt
-  sercom->SPI.INTENSET.bit.SSL = 1;
+  sercom->SPI.INTENCLR.reg = SERCOM_SPI_INTENCLR_MASK; // clear all interrupts
+  sercom->SPI.INTFLAG.reg = SERCOM_SPI_INTFLAG_MASK;
+  sercom->SPI.INTENSET.reg = SERCOM_SPI_INTENSET_SSL;
+  
 }
 
 void XSERCOM::initSPISlaveClock(SercomSpiClockMode clockMode)
@@ -137,4 +140,9 @@ void XSERCOM::clearSpiSslInterrupt() {
   if(sercom->SPI.INTFLAG.bit.SSL) {
     sercom->SPI.INTFLAG.bit.SSL = 1;  // writing a 1 clears the bit
   }
+}
+
+void XSERCOM::clearSpiInterrupts() {
+  volatile uint32_t all_interrupts = sercom->SPI.INTFLAG.reg;
+  sercom->SPI.INTFLAG.reg = all_interrupts;
 }

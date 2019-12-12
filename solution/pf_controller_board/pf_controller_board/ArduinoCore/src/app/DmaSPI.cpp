@@ -17,8 +17,9 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "DmaSPI.h"
 #include <Arduino.h>
+#include "DmaSPI.h"
+#include "DmaCommon.h"
 #include <wiring_private.h>
 #include <assert.h>
 
@@ -123,11 +124,11 @@ DmaSPISlaveClass::~DmaSPISlaveClass() {
 void DmaSPISlaveClass::begin()
 {
   init();
-  // Set pinmode?
+  // Set pinmode? no
   // pinMode(_uc_pinMiso, OUTPUT);
-  // pinMode(_uc_pinMosi, INPUT);
-  // pinMode(_uc_pinSCK, INPUT);
-  // pinMode(_uc_pinSS, INPUT);
+  // pinMode(_uc_pinMosi, INPUT_PULLUP);
+  // pinMode(_uc_pinSCK, INPUT_PULLUP);
+  // pinMode(_uc_pinSS, INPUT_PULLUP);
   
   // PIO init
   pinPeripheral(_uc_pinMiso, g_APinDescription[_uc_pinMiso].ulPinType);
@@ -138,8 +139,7 @@ void DmaSPISlaveClass::begin()
   // config(settings);  // seems like external clock not working, i think the hardware is broken?
   config(DEFAULT_SPI_SETTINGS);
   
-  // spi clk polarity is inverted, use cpol=1, cpha=0 (spi mode 2)
-  // config(SPISettings(0, MSBFIRST, SPI_MODE0));
+  // config(SPISettings(4000000, MSBFIRST, SPI_MODE0));
 }
 
 void DmaSPISlaveClass::init()
@@ -209,7 +209,7 @@ uint8_t* DmaSPISlaveClass::getTxDataPtr() {
 void DmaSPISlaveClass::queueTxData() {
   noInterrupts();
   _tx_pending = true;
-  swap_ptrs(_tw_buffer, _tx_buffer);
+  // swap_ptrs(_tw_buffer, _tx_buffer);
   interrupts();
 }
   
@@ -234,9 +234,10 @@ uint8_t* DmaSPISlaveClass::getRxDataPtr() {
 void DmaSPISlaveClass::ssInterrupt() {
   _rx_pending = false;
   auto sercom_id = _p_sercom->getSercomId();
-  _p_sercom->clearSpiSslInterrupt();
+  _p_sercom->disableSPI();
+  _p_sercom->clearSpiInterrupts();
   dma_tx.stop();
-  // dma_rx.stop();
+  dma_rx.stop();
   // LOW indicates SS selected, prepare transfer
   /*
   if (_tx_pending) {
@@ -251,19 +252,24 @@ void DmaSPISlaveClass::ssInterrupt() {
   */   
   // TEMPORARY
   for(int i=0; i<32; i++) {
-    _w_buffer[i] = i*2;
+    _w_buffer[i] = i;
   }
-  _w_buffer[2] = 7;
-  
-  _w_buffer[0] = 0x80;
+  _w_buffer[0] = 0xff;
   dma_tx.setupTxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
   dma_rx.setupRxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
   dma_tx.setupTxConfig(sercom_id, 0);
   dma_rx.setupRxConfig(sercom_id, 0);
   dma_tx.start();
   dma_rx.start();
+  _p_sercom->enableSPI();
   // dma_tx.triggerBeat();
   _rx_pending = true;  // next time should read the spi data.
+  delay(700);
+  DmacDescriptor* first_rx = Dma::firstDesc(0);
+  DmacDescriptor* working_rx = Dma::workingDesc(0);
+  DmacDescriptor* first_tx = Dma::firstDesc(1);
+  DmacDescriptor* working_tx = Dma::workingDesc(1);
+  volatile int x = 0;
 }
 
 
