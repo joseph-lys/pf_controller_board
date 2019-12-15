@@ -136,10 +136,10 @@ void DmaSPISlaveClass::begin()
   pinPeripheral(_uc_pinMosi, g_APinDescription[_uc_pinMosi].ulPinType);
   pinPeripheral(_uc_pinSS, g_APinDescription[_uc_pinSS].ulPinType);
 
-  // config(settings);  // seems like external clock not working, i think the hardware is broken?
-  config(DEFAULT_SPI_SETTINGS);
+  // config(settings);
+  // config(DEFAULT_SPI_SETTINGS);
   
-  // config(SPISettings(4000000, MSBFIRST, SPI_MODE0));
+  config(SPISettings(1000000, MSBFIRST, SPI_MODE0));
 }
 
 void DmaSPISlaveClass::init()
@@ -242,28 +242,21 @@ void DmaSPISlaveClass::ssInterrupt() {
 
   volatile int x;
   _p_sercom->clearSpiInterruptFlags();
+  _p_sercom->waitSyncSPI();
   if(ss) {  
     // rising edge (end of transfer)
     x++;
-    while(dma_rx.isPending()) { }
+    // while(dma_rx.isPending()) { }
     _rx_pending = true;  // next time should read the spi data.
   } else {  // falling edge (start of transfer)
     x--;
      _rx_pending = false;
-    // NVIC_DisableIRQ(_p_sercom->getIRQn());
-    _p_sercom->disableRxSPI();
-    _p_sercom->disableSPI();
-    // _p_sercom->noWaitDisableSPI();
-    // _p_sercom->waitSyncSPI();
-    dma_tx.stop();
-    // dma_tx.noWaitDisable();
-    // dma_tx.waitDisabled();
-    // dma_tx.noWaitSoftwareReset();
-    // dma_tx.waitDisabled();
-    dma_rx.stop();
-    // dma_rx.noWaitDisable();
-    // dma_rx.waitDisabled();
-    // dma_rx.noWaitSoftwareReset();
+    dma_tx.noWaitDisable();
+    dma_rx.noWaitDisable();
+    _p_sercom->noWaitDisableSPI();
+    dma_tx.waitDisabled();
+    dma_rx.waitDisabled();
+    // 
     // dma_rx.waitDisabled();
   
     // LOW indicates SS selected, prepare transfer
@@ -284,22 +277,17 @@ void DmaSPISlaveClass::ssInterrupt() {
     }
     _w_buffer[0] = 0xff;
     dma_tx.setupTxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
+    dma_tx.noWaitSoftwareReset();
+    dma_rx.noWaitSoftwareReset();
     dma_rx.setupRxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
+    dma_tx.waitDisabled();
+    dma_rx.waitDisabled();
     dma_tx.setupTxConfig(sercom_id, 0);
     dma_rx.setupRxConfig(sercom_id, 0);
-    dma_tx.start();
-    // dma_tx.noWaitEnable();
-    // dma_tx.waitEnabled();
-    dma_rx.start();
-    // dma_rx.noWaitEnable();
-    // dma_rx.waitEnabled();
-    _p_sercom->enableRxSPI();
-    _p_sercom->enableSPI();
-    // NVIC_EnableIRQ(_p_sercom->getIRQn());
-    // _p_sercom->noWaitEnableSPI();
-    // _p_sercom->waitSyncSPI();
-    // dma_tx.triggerBeat();
-    // delayMicroseconds(200);
+    dma_tx.waitDisabled();  // wait for software reset complete before enabling SPI
+    dma_rx.noWaitEnable();
+    dma_tx.noWaitEnable();
+    _p_sercom->noWaitEnableSPI();
   }
   _p_sercom->clearSpiInterruptFlags();
 }

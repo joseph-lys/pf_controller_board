@@ -105,7 +105,7 @@ void XSERCOM::initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pa
 
   // Setting NVIC
   NVIC_EnableIRQ(IdNvic);
-  NVIC_SetPriority (IdNvic, 0);  /* set Priority 0, this interrupt needs to be handled ASAP*/
+  NVIC_SetPriority (IdNvic, 0);  /* set Priority*/
   
   GCLK->CLKCTRL.reg =  GCLK_CLKCTRL_ID( clockId ) | // Sercom Clock Id
                       GCLK_CLKCTRL_GEN_GCLK0 | // Generic Clock Generator 0 is source
