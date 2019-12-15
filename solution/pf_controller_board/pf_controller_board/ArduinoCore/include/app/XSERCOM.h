@@ -28,14 +28,55 @@ typedef enum
 } SercomSpiRXSlavePad;
 
 class XSERCOM : public SERCOM {
+private:
+  const uint8_t sercom_id_;
+  const IRQn_Type irqn_;
 public:
   XSERCOM(Sercom* s);
-  uint8_t getSercomId();
+  
+  inline uint8_t getSercomId() {
+    return sercom_id_;
+  }
+  
+  inline IRQn_Type getIRQn() {
+    return irqn_;
+  }
+  
   Sercom* getSercomPointer();
   void initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pad, SercomSpiCharSize charSize, SercomDataOrder dataOrder);
   void initSPISlaveClock(SercomSpiClockMode clockMode);
-  void clearSpiSslInterrupt();
-  void clearSpiInterrupts();
+  inline void clearSpiSslInterrupt();
+  
+  inline void clearSpiInterruptFlags() {
+    auto flags = sercom->SPI.INTFLAG.reg;
+    sercom->SPI.INTFLAG.reg = flags;
+  }
+
+  inline void noWaitDisableSPI() {
+    sercom->SPI.CTRLA.bit.ENABLE = 0;
+  }
+  inline void noWaitEnableSPI() {
+    sercom->SPI.CTRLA.bit.ENABLE = 1;
+  }
+  inline void waitSyncSPI() {
+    while(sercom->SPI.SYNCBUSY.reg) { }
+  }
+  
+  inline void disableRxSPI() {
+    sercom->SPI.CTRLB.bit.RXEN = 0;
+  }
+  
+  inline void enableRxSPI() {
+    sercom->SPI.CTRLB.bit.RXEN = 1;
+  }
+  
+  inline void disableSpiInterrruptSSL() {
+    sercom->SPI.INTENCLR.bit.SSL = 1;
+  }
+  
+  inline void enableSpiInterrruptSSL() {
+    sercom->SPI.INTENSET.bit.SSL = 1;
+  }
 };
 
 

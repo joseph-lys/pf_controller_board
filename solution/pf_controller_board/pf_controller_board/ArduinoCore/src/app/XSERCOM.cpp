@@ -7,13 +7,9 @@
 
 #include "XSERCOM.h"
 #include "variant.h"
+#include "assert.h"
 
-XSERCOM::XSERCOM(Sercom* s) 
-: SERCOM(s) {
-  
-}
-
-uint8_t XSERCOM::getSercomId() {
+static uint8_t getSercomIdInternal(Sercom* sercom) {
   uint8_t x = 0;
   if(sercom == SERCOM0) { 
     x = 0; 
@@ -30,6 +26,30 @@ uint8_t XSERCOM::getSercomId() {
   }
   return x;
 }
+
+static IRQn_Type getIRQnInternal(Sercom* sercom) {
+  if(sercom == SERCOM0) { 
+    return SERCOM0_IRQn;
+  } else if(sercom == SERCOM1) {
+    return SERCOM1_IRQn;
+  } else if(sercom == SERCOM2) {
+    return SERCOM2_IRQn;
+  } else if(sercom == SERCOM3) {
+    return SERCOM3_IRQn;
+  } else if(sercom == SERCOM4) {
+    return SERCOM4_IRQn;
+  } else if(sercom == SERCOM5) {
+    return SERCOM5_IRQn;
+  } else {
+    assert(false && "Unknown IRQn");  
+  }
+}
+
+XSERCOM::XSERCOM(Sercom* s) 
+: SERCOM(s), sercom_id_(getSercomIdInternal(s)), irqn_(getIRQnInternal(s)) {
+  
+}
+
 
 Sercom* XSERCOM::getSercomPointer() {
   return sercom;
@@ -108,9 +128,8 @@ void XSERCOM::initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pa
     SERCOM_SPI_CTRLB_RXEN | // Active the SPI receiver.
     SERCOM_SPI_CTRLB_SSDE ;	// Enable Slave Select Low Interrupt
   sercom->SPI.INTENCLR.reg = SERCOM_SPI_INTENCLR_MASK; // clear all interrupts
-  sercom->SPI.INTFLAG.reg = SERCOM_SPI_INTFLAG_MASK;
-  sercom->SPI.INTENSET.reg = SERCOM_SPI_INTENSET_SSL;
-  
+  clearSpiInterruptFlags();
+  enableSpiInterrruptSSL();
 }
 
 void XSERCOM::initSPISlaveClock(SercomSpiClockMode clockMode)
@@ -138,11 +157,6 @@ void XSERCOM::initSPISlaveClock(SercomSpiClockMode clockMode)
 
 void XSERCOM::clearSpiSslInterrupt() {
   if(sercom->SPI.INTFLAG.bit.SSL) {
-    sercom->SPI.INTFLAG.bit.SSL = 1;  // writing a 1 clears the bit
+    sercom->SPI.INTFLAG.reg = SERCOM_SPI_INTFLAG_SSL;  // writing a 1 clears the bit
   }
-}
-
-void XSERCOM::clearSpiInterrupts() {
-  volatile uint32_t all_interrupts = sercom->SPI.INTFLAG.reg;
-  sercom->SPI.INTFLAG.reg = all_interrupts;
 }

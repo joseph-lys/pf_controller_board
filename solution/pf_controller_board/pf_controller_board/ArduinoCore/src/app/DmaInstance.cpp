@@ -150,14 +150,19 @@ void DmaInstance::start() {
 void DmaInstance::stop() {
   Dmac* dmac = DMAC;
   __disable_irq();
-  dmac->CHID.bit.ID = dma_channel;
+  dmac->CHID.reg = DMAC_CHID_ID(dma_channel);
+  dmac->CHCTRLB.bit.CMD = DMAC_CHCTRLB_CMD_SUSPEND_Val;  // suspend channel or a lot of weird shit happens
   // channel disable
   dmac->CHCTRLA.bit.ENABLE = 0;
-  while(0 != dmac->CHCTRLA.bit.ENABLE) {}  // wait for disable
-  // sw reset
-  dmac->CHCTRLA.bit.SWRST = 1;
-  while(0 != dmac->CHCTRLA.bit.SWRST) {}  // wait for reset
   __enable_irq();
+  waitDisabled();
+
+  // sw reset
+  __disable_irq();
+  dmac->CHID.reg = DMAC_CHID_ID(dma_channel);
+  dmac->CHCTRLA.bit.SWRST = 1;
+  __enable_irq();
+  waitDisabled();
 }
 
 void DmaInstance::triggerBeat() {

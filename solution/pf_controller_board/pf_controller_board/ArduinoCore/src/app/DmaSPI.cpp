@@ -232,44 +232,76 @@ uint8_t* DmaSPISlaveClass::getRxDataPtr() {
 }
 
 void DmaSPISlaveClass::ssInterrupt() {
-  _rx_pending = false;
+    DmacDescriptor* first_rx = Dma::firstDesc(0);
+    DmacDescriptor* working_rx = Dma::workingDesc(0);
+    DmacDescriptor* first_tx = Dma::firstDesc(1);
+    DmacDescriptor* working_tx = Dma::workingDesc(1);
+    
   auto sercom_id = _p_sercom->getSercomId();
-  _p_sercom->disableSPI();
-  _p_sercom->clearSpiInterrupts();
-  dma_tx.stop();
-  dma_rx.stop();
-  // LOW indicates SS selected, prepare transfer
-  /*
-  if (_tx_pending) {
-    noInterrupts();
-    if(_tx_pending) {  // recheck pending flag for data race
-      _w_buffer[0] = 0;  // clear first byte, assume this will flag the buffer as empty
-      swap_ptrs(_w_buffer, _tx_buffer);
-      _tx_pending = false;       
+  auto ss = PORT->Group[g_APinDescription[_uc_pinSS].ulPort].IN.reg & PORT->Group[g_APinDescription[_uc_pinSS].ulPort].IN.reg;
+
+  volatile int x;
+  _p_sercom->clearSpiInterruptFlags();
+  if(ss) {  
+    // rising edge (end of transfer)
+    x++;
+    while(dma_rx.isPending()) { }
+    _rx_pending = true;  // next time should read the spi data.
+  } else {  // falling edge (start of transfer)
+    x--;
+     _rx_pending = false;
+    // NVIC_DisableIRQ(_p_sercom->getIRQn());
+    _p_sercom->disableRxSPI();
+    _p_sercom->disableSPI();
+    // _p_sercom->noWaitDisableSPI();
+    // _p_sercom->waitSyncSPI();
+    dma_tx.stop();
+    // dma_tx.noWaitDisable();
+    // dma_tx.waitDisabled();
+    // dma_tx.noWaitSoftwareReset();
+    // dma_tx.waitDisabled();
+    dma_rx.stop();
+    // dma_rx.noWaitDisable();
+    // dma_rx.waitDisabled();
+    // dma_rx.noWaitSoftwareReset();
+    // dma_rx.waitDisabled();
+  
+    // LOW indicates SS selected, prepare transfer
+    /*
+    if (_tx_pending) {
+      noInterrupts();
+      if(_tx_pending) {  // recheck pending flag for data race
+        _w_buffer[0] = 0;  // clear first byte, assume this will flag the buffer as empty
+        swap_ptrs(_w_buffer, _tx_buffer);
+        _tx_pending = false;       
+      }
+      interrupts(); 
+    }   
+    */   
+    // TEMPORARY
+    for(int i=0; i<32; i++) {
+      _w_buffer[i] = i;
     }
-    interrupts(); 
-  }   
-  */   
-  // TEMPORARY
-  for(int i=0; i<32; i++) {
-    _w_buffer[i] = i;
+    _w_buffer[0] = 0xff;
+    dma_tx.setupTxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
+    dma_rx.setupRxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
+    dma_tx.setupTxConfig(sercom_id, 0);
+    dma_rx.setupRxConfig(sercom_id, 0);
+    dma_tx.start();
+    // dma_tx.noWaitEnable();
+    // dma_tx.waitEnabled();
+    dma_rx.start();
+    // dma_rx.noWaitEnable();
+    // dma_rx.waitEnabled();
+    _p_sercom->enableRxSPI();
+    _p_sercom->enableSPI();
+    // NVIC_EnableIRQ(_p_sercom->getIRQn());
+    // _p_sercom->noWaitEnableSPI();
+    // _p_sercom->waitSyncSPI();
+    // dma_tx.triggerBeat();
+    // delayMicroseconds(200);
   }
-  _w_buffer[0] = 0xff;
-  dma_tx.setupTxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
-  dma_rx.setupRxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
-  dma_tx.setupTxConfig(sercom_id, 0);
-  dma_rx.setupRxConfig(sercom_id, 0);
-  dma_tx.start();
-  dma_rx.start();
-  _p_sercom->enableSPI();
-  // dma_tx.triggerBeat();
-  _rx_pending = true;  // next time should read the spi data.
-  delay(700);
-  DmacDescriptor* first_rx = Dma::firstDesc(0);
-  DmacDescriptor* working_rx = Dma::workingDesc(0);
-  DmacDescriptor* first_tx = Dma::firstDesc(1);
-  DmacDescriptor* working_tx = Dma::workingDesc(1);
-  volatile int x = 0;
+  _p_sercom->clearSpiInterruptFlags();
 }
 
 
