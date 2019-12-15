@@ -26,14 +26,19 @@ void Dma::defaultDesc(DmacDescriptor& desc) {
   desc.BTCNT.reg = 0;
   
   // Set descriptor for TX
-  desc.BTCTRL.bit.VALID = 1;
-  desc.BTCTRL.bit.EVOSEL = DMAC_BTCTRL_EVOSEL_DISABLE_Val;
-  desc.BTCTRL.bit.BLOCKACT = DMAC_BTCTRL_BLOCKACT_INT_Val;
-  desc.BTCTRL.bit.BEATSIZE = DMAC_BTCTRL_BEATSIZE_BYTE_Val;
-  desc.BTCTRL.bit.SRCINC = 0;
-  desc.BTCTRL.bit.DSTINC = 0;  
-  desc.BTCTRL.bit.STEPSEL = 0;
-  desc.BTCTRL.bit.STEPSIZE = DMAC_BTCTRL_STEPSIZE_X1_Val;
+  // desc.BTCTRL.bit.VALID = 1;
+  // desc.BTCTRL.bit.EVOSEL = DMAC_BTCTRL_EVOSEL_DISABLE_Val;
+  // desc.BTCTRL.bit.BLOCKACT = DMAC_BTCTRL_BLOCKACT_INT_Val;
+  // desc.BTCTRL.bit.BEATSIZE = DMAC_BTCTRL_BEATSIZE_BYTE_Val;
+  // desc.BTCTRL.bit.SRCINC = 0;
+  // desc.BTCTRL.bit.DSTINC = 0;  
+  // desc.BTCTRL.bit.STEPSEL = 0;
+  // desc.BTCTRL.bit.STEPSIZE = DMAC_BTCTRL_STEPSIZE_X1_Val;
+  desc.BTCTRL.reg = DMAC_BTCTRL_VALID |
+                    DMAC_BTCTRL_EVOSEL_DISABLE |
+                    DMAC_BTCTRL_BLOCKACT_INT |
+                    DMAC_BTCTRL_BEATSIZE_BYTE |
+                    DMAC_BTCTRL_STEPSIZE_X1;
   desc.BTCNT.reg = 0;  // undetermined until transfer initiated
   desc.SRCADDR.reg = 0;  // undetermined until transfer initiated  
   desc.DESCADDR.reg = 0; 
@@ -101,16 +106,18 @@ void Dma::init() {
   Dmac* dmac = DMAC;
   /// configure power management
   PM->AHBMASK.bit.DMAC_ = 1;
+  PM->APBBMASK.bit.DMAC_ = 1;
   
   /// configure clock
-  GCLK->CLKCTRL.reg =  GCLK_CLKCTRL_ID_DAC| // Generic Clock 21 (DAC)
+  GCLK->CLKCTRL.reg =  GCLK_CLKCTRL_ID_DAC | // Generic Clock 21 (DAC)
                        GCLK_CLKCTRL_GEN_GCLK0 | // Generic Clock Generator 0 is source
                        GCLK_CLKCTRL_CLKEN ;
   while ( GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY ) {}  // Wait for sync
      
   /// configure NVIC
-  NVIC_EnableIRQ(DMAC_IRQn);
+  NVIC_DisableIRQ(DMAC_IRQn);
   NVIC_SetPriority(DMAC_IRQn, 1);
+  NVIC_EnableIRQ(DMAC_IRQn);
   
   /// Configure common DMAC stuff
   dmac->CTRL.bit.DMAENABLE = 0;
@@ -120,10 +127,11 @@ void Dma::init() {
   
   dmac->BASEADDR.reg = reinterpret_cast<uint32_t>(&(dma_first_desc[0]));  
   dmac->WRBADDR.reg = reinterpret_cast<uint32_t>(&(dma_working_desc[0]));
-  dmac->CTRL.bit.LVLEN0 = 1;
-  dmac->CTRL.bit.LVLEN1 = 1;
-  dmac->CTRL.bit.LVLEN2 = 1;
-  dmac->CTRL.bit.LVLEN3 = 1;
+  dmac->CTRL.reg = DMAC_CTRL_LVLEN0 |
+                   DMAC_CTRL_LVLEN1 |
+                   DMAC_CTRL_LVLEN3 |
+                   DMAC_CTRL_LVLEN2;
+  dmac->PRICTRL0.reg = 0;  // static priority levels
   dmac->CTRL.bit.DMAENABLE = 1;
   while (1 != dmac->CTRL.bit.DMAENABLE) {}
 }

@@ -104,7 +104,7 @@ void XSERCOM::initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pa
   }
 
   // Setting NVIC
-  NVIC_EnableIRQ(IdNvic);
+  NVIC_DisableIRQ(IdNvic);
   NVIC_SetPriority (IdNvic, 0);  /* set Priority*/
   
   GCLK->CLKCTRL.reg =  GCLK_CLKCTRL_ID( clockId ) | // Sercom Clock Id
@@ -130,6 +130,7 @@ void XSERCOM::initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pa
   sercom->SPI.INTENCLR.reg = SERCOM_SPI_INTENCLR_MASK; // clear all interrupts
   clearSpiInterruptFlags();
   enableSpiInterrruptSSL();
+  NVIC_EnableIRQ(IdNvic);
 }
 
 void XSERCOM::initSPISlaveClock(SercomSpiClockMode clockMode)

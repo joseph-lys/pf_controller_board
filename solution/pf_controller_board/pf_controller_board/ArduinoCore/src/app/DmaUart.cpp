@@ -184,6 +184,8 @@ void DmaUart::begin(unsigned long baudrate, uint16_t config) {
   SERCOM2->USART.INTENCLR.bit.RXS = 1;
   // SERCOM2->USART.INTENCLR.bit.TXC = 1;
   SERCOM2->USART.INTENSET.bit.TXC = 1;
+  NVIC_SetPriority(sercom->getIRQn(), 2);
+  NVIC_EnableIRQ(sercom->getIRQn());
   sercom->enableUART();
   
   reader.start();

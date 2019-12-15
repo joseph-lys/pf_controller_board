@@ -243,8 +243,7 @@ void DmaSPISlaveClass::ssInterrupt() {
   volatile int x;
   _p_sercom->clearSpiInterruptFlags();
   _p_sercom->waitSyncSPI();
-  if(ss) {  
-    // rising edge (end of transfer)
+  if(ss) { // rising edge (end of transfer)
     x++;
     // while(dma_rx.isPending()) { }
     _rx_pending = true;  // next time should read the spi data.
@@ -256,6 +255,8 @@ void DmaSPISlaveClass::ssInterrupt() {
     _p_sercom->noWaitDisableSPI();
     dma_tx.waitDisabled();
     dma_rx.waitDisabled();
+    dma_tx.noWaitSoftwareReset();
+    dma_rx.noWaitSoftwareReset();
     // 
     // dma_rx.waitDisabled();
   
@@ -272,23 +273,25 @@ void DmaSPISlaveClass::ssInterrupt() {
     }   
     */   
     // TEMPORARY
-    for(int i=0; i<32; i++) {
+    for (int i=0; i<buffer_size; i++) {
       _w_buffer[i] = i;
     }
     _w_buffer[0] = 0xff;
-    dma_tx.setupTxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
-    dma_tx.noWaitSoftwareReset();
-    dma_rx.noWaitSoftwareReset();
-    dma_rx.setupRxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
+    
     dma_tx.waitDisabled();
-    dma_rx.waitDisabled();
+    dma_tx.setupTxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
     dma_tx.setupTxConfig(sercom_id, 0);
-    dma_rx.setupRxConfig(sercom_id, 0);
-    dma_tx.waitDisabled();  // wait for software reset complete before enabling SPI
-    dma_rx.noWaitEnable();
     dma_tx.noWaitEnable();
+    dma_rx.setupRxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
+    dma_rx.setupRxConfig(sercom_id, 0);
+    dma_tx.waitEnabled();
     _p_sercom->noWaitEnableSPI();
+    // dma_tx.triggerBeat();
+    // while(dma_tx.isBusy() || dma_tx.isPending()) { }  // wait for the first byte to be sent
+    dma_rx.waitDisabled();
+    dma_rx.noWaitEnable();
   }
+  _p_sercom->waitSyncSPI();
   _p_sercom->clearSpiInterruptFlags();
 }
 

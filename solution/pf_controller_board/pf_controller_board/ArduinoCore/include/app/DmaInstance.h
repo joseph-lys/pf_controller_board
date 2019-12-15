@@ -26,18 +26,23 @@ class DmaInstance {
   // Channel configuration for Sercom Rx
   void setupRxConfig(uint8_t sercom_id);
   void setupRxConfig(uint8_t sercom_id, uint32_t priority);
-  
-  // Descriptor configuration for Sercom Tx
-  void setupTxDescFirst(uint32_t tx_address, uint8_t* tx_buf, uint32_t len);
-  
-  // Descriptor configuration for Sercom Rx
-  void setupRxDescFirst(uint32_t rx_address, uint8_t* rx_buf, uint32_t len);
+
   
   // Descriptor configuration for Sercom Tx
   void setupTxDescAny(DmacDescriptor* desc, uint32_t tx_address, uint8_t* tx_buf, uint32_t len);
   
   // Descriptor configuration for Sercom Rx
   void setupRxDescAny(DmacDescriptor* desc, uint32_t rx_address, uint8_t* rx_buf, uint32_t len);
+    
+  // First descriptor configuration for Sercom Tx
+  inline void setupTxDescFirst(uint32_t tx_address, uint8_t* tx_buf, uint32_t len) {
+    setupTxDescAny(ch_desc, tx_address, tx_buf, len);
+  }
+  
+  // First descriptor configuration for Sercom Rx
+  inline void setupRxDescFirst(uint32_t rx_address, uint8_t* rx_buf, uint32_t len) {
+    setupRxDescAny(ch_desc, rx_address, rx_buf, len);
+  }
   
   // Start dmac channel
   void start();
@@ -48,6 +53,8 @@ class DmaInstance {
     DMAC->CHID.reg = DMAC_CHID_ID(dma_channel);
     if (_has_callback) {
       DMAC->CHINTENSET.reg = DMAC_CHINTFLAG_TERR | DMAC_CHINTFLAG_TCMPL;  
+    } else {
+      DMAC->CHINTENCLR.reg = DMAC->CHINTENSET.reg;
     }
     DMAC->CHCTRLA.reg = DMAC_CHCTRLA_ENABLE;
     __enable_irq();
@@ -98,8 +105,13 @@ class DmaInstance {
   void triggerBeat();
   
   // returns channel's pending flag
-  bool isPending();
+  inline bool isPending() {
+    return static_cast<bool>(DMAC->PENDCH.reg & (1u << dma_channel));
+  }
   
+  inline bool isBusy() {
+    return static_cast<bool>(DMAC->BUSYCH.reg & (1u << dma_channel));
+  }
   
   private:
   const bool _has_callback;
