@@ -245,7 +245,11 @@ void DmaSPISlaveClass::ssInterrupt() {
   _p_sercom->waitSyncSPI();
   if(ss) { // rising edge (end of transfer)
     x++;
-    // while(dma_rx.isPending()) { }
+    // while(dma_rx.isPending() || dma_rx.isBusy()) { }
+    // dma_rx.stop();
+    // while(dma_tx.isPending() || dma_tx.isBusy()) { }
+    // dma_tx.stop();
+    // _p_sercom->disableSPI();
     _rx_pending = true;  // next time should read the spi data.
   } else {  // falling edge (start of transfer)
     x--;
@@ -257,10 +261,7 @@ void DmaSPISlaveClass::ssInterrupt() {
     dma_rx.waitDisabled();
     dma_tx.noWaitSoftwareReset();
     dma_rx.noWaitSoftwareReset();
-    // 
-    // dma_rx.waitDisabled();
-  
-    // LOW indicates SS selected, prepare transfer
+    
     /*
     if (_tx_pending) {
       noInterrupts();

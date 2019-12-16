@@ -163,7 +163,7 @@ class DmaSPISlaveClass {
   
   // get current RxDataPtr, if there is no pending RxData, returns a nullptr
   uint8_t* getRxDataPtr();
-   
+  
 };
 
 
