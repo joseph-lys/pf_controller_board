@@ -27,8 +27,6 @@
 #define SPI_IMODE_EXTINT 1
 #define SPI_IMODE_GLOBAL 2
 
-#define SPI_BUFFER_SIZE 128
-
 template<typename T>
 void swap_ptrs(T& a, T& b) {
   T temp = b;
@@ -90,7 +88,7 @@ static SercomSpiRXSlavePad SPISlaveEquivalentRxPad(SercomSpiTXPad original_txpad
 DmaSPISlaveClass::DmaSPISlaveClass(XSERCOM *p_sercom,uint8_t dma_rx_channel, uint8_t dma_tx_channel, uint8_t uc_pinMISO, uint8_t uc_pinSCK, uint8_t uc_pinMOSI, uint8_t uc_pinSS, SercomSpiTXSlavePad PadTx, SercomSpiRXSlavePad PadRx) 
 : 
 settings(SPISettings(0, MSBFIRST, SPI_MODE0)),
-buffer_size(SPI_BUFFER_SIZE), dma_rx(dma_rx_channel, nullptr), dma_tx(dma_tx_channel, nullptr),
+dma_rx(dma_rx_channel, nullptr), dma_tx(dma_tx_channel, nullptr),
 _data_register(reinterpret_cast<uint32_t>(&p_sercom->getSercomPointer()->SPI.DATA.reg))
 {
   initialized = false;
@@ -108,27 +106,24 @@ _data_register(reinterpret_cast<uint32_t>(&p_sercom->getSercomPointer()->SPI.DAT
   _padRx=PadRx;
   
   // initialize the buffer memory
-  _tw_buffer = new uint8_t[SPI_BUFFER_SIZE]{0};
-  _tx_buffer = new uint8_t[SPI_BUFFER_SIZE]{0};
-  _w_buffer = new uint8_t[SPI_BUFFER_SIZE]{0};
-  _rw_buffer = new uint8_t[SPI_BUFFER_SIZE]{0};
+  _tw_buffer = new uint8_t[DMA_SPI_BUFFER_SIZE]{0};
+  _tx_buffer = new uint8_t[DMA_SPI_BUFFER_SIZE]{0};
+  _rx_buffer = new uint8_t[DMA_SPI_BUFFER_SIZE]{0};
+  _rw_buffer = new uint8_t[DMA_SPI_BUFFER_SIZE]{0};
 }
 
 DmaSPISlaveClass::~DmaSPISlaveClass() {
   delete[] _tw_buffer;
   delete[] _tx_buffer;
-  delete[] _w_buffer;
+  delete[] _rx_buffer;
   delete[] _rw_buffer;
 }
 
 void DmaSPISlaveClass::begin()
 {
+  DmacDescriptor* desc;
+  
   init();
-  // Set pinmode? no
-  // pinMode(_uc_pinMiso, OUTPUT);
-  // pinMode(_uc_pinMosi, INPUT_PULLUP);
-  // pinMode(_uc_pinSCK, INPUT_PULLUP);
-  // pinMode(_uc_pinSS, INPUT_PULLUP);
   
   // PIO init
   pinPeripheral(_uc_pinMiso, g_APinDescription[_uc_pinMiso].ulPinType);
@@ -140,6 +135,20 @@ void DmaSPISlaveClass::begin()
   // config(DEFAULT_SPI_SETTINGS);
   
   config(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+  
+  // configure DMA
+  dma_tx.stop();
+  dma_rx.stop();
+  dma_tx.setupTxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
+  dma_rx.setupRxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
+  dma_tx.setupTxConfig(_p_sercom->getSercomId(), 0);  // setup Tx with priority 0
+  dma_rx.setupRxConfig(_p_sercom->getSercomId(), 0);  // setup Tx with priority 0
+  desc = dma_tx.getDescFirst();
+  desc->DESCADDR.reg = reinterpret_cast<uint32_t>(desc);  // point back to itself, never ending loop
+  desc = dma_rx.getDescFirst();
+  desc->DESCADDR.reg = reinterpret_cast<uint32_t>(desc);  // point back to itself, never ending loop
+  dma_tx.start();
+  dma_rx.start();
 }
 
 void DmaSPISlaveClass::init()
@@ -215,7 +224,6 @@ void DmaSPISlaveClass::queueTxData() {
   
 uint8_t* DmaSPISlaveClass::getRxDataPtr() {
   uint8_t* ptr = nullptr;
-    
   if(_rx_pending) {
     if(digitalRead(_uc_pinSS)) {
       noInterrupts();
@@ -231,68 +239,49 @@ uint8_t* DmaSPISlaveClass::getRxDataPtr() {
   return ptr;
 }
 
-void DmaSPISlaveClass::ssInterrupt() {
-    DmacDescriptor* first_rx = Dma::firstDesc(0);
-    DmacDescriptor* working_rx = Dma::workingDesc(0);
-    DmacDescriptor* first_tx = Dma::firstDesc(1);
-    DmacDescriptor* working_tx = Dma::workingDesc(1);
-    
-  auto sercom_id = _p_sercom->getSercomId();
+void DmaSPISlaveClass::dataIn() {
+  uint32_t x; 
+  uint32_t idx;
+  x = 0;
+  while(dma_rx.isPending() || dma_rx.isBusy()) { }
+  while (x == 0) {  // assuming that dma has started, working count should not stay 0 (possibly 0 only if loading desc)
+    x = dma_rx.getWorkingCount();
+  }
+  x = buffer_size - x;
+  for (uint32_t i=1; i<buffer_size; i++) {
+    idx = (i + x) & buffer_mask;
+    _rx_buffer[i] = _w_buffer[idx];
+  }
+  _rx_pending = true;
+}
+
+void DmaSPISlaveClass::dataOut() {
+  uint32_t x;
+  uint32_t idx;
+  x = 0;
+  while(dma_tx.isPending() || dma_tx.isBusy()) { }
+  while (x == 0) {  // assuming that dma has started, working count should not stay 0 (possibly 0 only if loading desc)
+    x = dma_tx.getWorkingCount();   
+  }
+  x = buffer_size - x;
+  _p_sercom->transferDataSPI(_w_buffer[x]);  // write first byte
+  for (uint32_t i=1; i<buffer_size; i++) {
+    idx = (i + x) & buffer_mask;
+    _w_buffer[idx] = _tx_buffer[i];
+  }
+}
+void DmaSPISlaveClass::ssInterrupt() {    
   auto ss = PORT->Group[g_APinDescription[_uc_pinSS].ulPort].IN.reg & PORT->Group[g_APinDescription[_uc_pinSS].ulPort].IN.reg;
 
-  volatile int x;
   _p_sercom->clearSpiInterruptFlags();
-  _p_sercom->waitSyncSPI();
   if(ss) { // rising edge (end of transfer)
-    x++;
-    // while(dma_rx.isPending() || dma_rx.isBusy()) { }
-    // dma_rx.stop();
-    // while(dma_tx.isPending() || dma_tx.isBusy()) { }
-    // dma_tx.stop();
-    // _p_sercom->disableSPI();
-    _rx_pending = true;  // next time should read the spi data.
+    dataIn();
   } else {  // falling edge (start of transfer)
-    x--;
-     _rx_pending = false;
-    dma_tx.noWaitDisable();
-    dma_rx.noWaitDisable();
-    _p_sercom->noWaitDisableSPI();
-    dma_tx.waitDisabled();
-    dma_rx.waitDisabled();
-    dma_tx.noWaitSoftwareReset();
-    dma_rx.noWaitSoftwareReset();
-    
-    /*
-    if (_tx_pending) {
-      noInterrupts();
-      if(_tx_pending) {  // recheck pending flag for data race
-        _w_buffer[0] = 0;  // clear first byte, assume this will flag the buffer as empty
-        swap_ptrs(_w_buffer, _tx_buffer);
-        _tx_pending = false;       
-      }
-      interrupts(); 
-    }   
-    */   
-    // TEMPORARY
+    dataOut();
     for (int i=0; i<buffer_size; i++) {
       _w_buffer[i] = i;
     }
-    _w_buffer[0] = 0xff;
-    
-    dma_tx.waitDisabled();
-    dma_tx.setupTxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
-    dma_tx.setupTxConfig(sercom_id, 0);
-    dma_tx.noWaitEnable();
-    dma_rx.setupRxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
-    dma_rx.setupRxConfig(sercom_id, 0);
-    dma_tx.waitEnabled();
-    _p_sercom->noWaitEnableSPI();
-    // dma_tx.triggerBeat();
-    // while(dma_tx.isBusy() || dma_tx.isPending()) { }  // wait for the first byte to be sent
-    dma_rx.waitDisabled();
-    dma_rx.noWaitEnable();
   }
-  _p_sercom->waitSyncSPI();
   _p_sercom->clearSpiInterruptFlags();
 }
 

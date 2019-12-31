@@ -23,6 +23,9 @@
 #include <Arduino.h>
 #include <DmaInstance.h>
 
+// DMA SPI buffer size, must be a power of 2
+#define DMA_SPI_BUFFER_SIZE 128
+
 // SPI_HAS_TRANSACTION means SPI has
 //   - beginTransaction()
 //   - endTransaction()
@@ -114,10 +117,16 @@ const SPISettings DEFAULT_SPI_SETTINGS = SPISettings();
 
 
 class DmaSPISlaveClass {
+  // static_assert(uint32_t(DMA_SPI_BUFFER_SIZE) & uint32_t(DMA_SPI_BUFFER_SIZE - 1) == 0, 
+  //              "Expected buffer size to be a power of 2");
+  
   public:
   DmaSPISlaveClass(XSERCOM *p_sercom, uint8_t dma_rx_channel, uint8_t dma_tx_channel, uint8_t uc_pinMISO, uint8_t uc_pinSCK, uint8_t uc_pinMOSI, uint8_t uc_pinSS, SercomSpiTXSlavePad, SercomSpiRXSlavePad);
   ~DmaSPISlaveClass();
-  const uint32_t buffer_size;
+  enum : uint32_t {
+    buffer_size = DMA_SPI_BUFFER_SIZE,
+    buffer_mask = DMA_SPI_BUFFER_SIZE - 1
+  };
   void setBitOrder(BitOrder order);
   void setDataMode(uint8_t uc_mode);
   void begin();
@@ -128,12 +137,15 @@ class DmaSPISlaveClass {
   volatile bool _rx_pending;
   volatile uint8_t* volatile _tw_buffer;
   volatile uint8_t* volatile _tx_buffer;
-  volatile uint8_t* volatile _w_buffer;
+  volatile uint8_t _w_buffer[DmaSPISlaveClass::buffer_size];
+  volatile uint8_t* volatile _rx_buffer;
   volatile uint8_t* volatile _rw_buffer;
   
   void init();
   void config(SPISettings settings);
   void end();
+  void dataIn();
+  void dataOut();
   
   XSERCOM *_p_sercom;
   uint8_t _uc_pinMiso;

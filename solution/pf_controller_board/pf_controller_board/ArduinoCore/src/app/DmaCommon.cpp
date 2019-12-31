@@ -72,34 +72,7 @@ void Dma::irqHandler() {
 
 void Dma::swTrigger(uint8_t channel){
   Dmac* dmac = DMAC;
-  switch(channel) {
-    case 0:
-      dmac->SWTRIGCTRL.bit.SWTRIG0 = 1; break;
-    case 1:
-      dmac->SWTRIGCTRL.bit.SWTRIG1 = 1; break;
-    case 2:
-      dmac->SWTRIGCTRL.bit.SWTRIG2 = 1; break;
-    case 3:
-      dmac->SWTRIGCTRL.bit.SWTRIG3 = 1; break;
-    case 4:
-      dmac->SWTRIGCTRL.bit.SWTRIG4 = 1; break;
-    case 5:
-      dmac->SWTRIGCTRL.bit.SWTRIG5 = 1; break;
-    case 6:
-      dmac->SWTRIGCTRL.bit.SWTRIG6 = 1; break;
-    case 7:
-      dmac->SWTRIGCTRL.bit.SWTRIG7 = 1; break;
-    case 8:
-      dmac->SWTRIGCTRL.bit.SWTRIG8 = 1; break;
-    case 9:
-      dmac->SWTRIGCTRL.bit.SWTRIG9 = 1; break;
-    case 10:
-      dmac->SWTRIGCTRL.bit.SWTRIG10 = 1; break;
-    case 11:
-      dmac->SWTRIGCTRL.bit.SWTRIG11 = 1; break;
-    default:
-      break;
-  }
+  dmac->SWTRIGCTRL.reg = DMAC_SWTRIGCTRL_SWTRIG(channel);
 }
 
 void Dma::init() {

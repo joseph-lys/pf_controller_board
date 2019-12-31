@@ -160,16 +160,36 @@ void DmaInstance::stop() {
   // channel disable
   dmac->CHCTRLA.bit.ENABLE = 0;
   __enable_irq();
-  waitDisabled();
+  while (dmac->CHCTRLA.reg) { }
 
   // sw reset
   __disable_irq();
   dmac->CHID.reg = DMAC_CHID_ID(dma_channel);
   dmac->CHCTRLA.bit.SWRST = 1;
   __enable_irq();
-  waitDisabled();
+  while (dmac->CHCTRLA.reg) { }
 }
 
 void DmaInstance::triggerBeat() {
   Dma::swTrigger(dma_channel);
+}
+
+DmacDescriptor* DmaInstance::getDescFirst() {
+  return Dma::firstDesc(dma_channel);
+}
+
+uint32_t DmaInstance::getWorkingCount() {
+  return Dma::workingDesc(dma_channel)->BTCNT.reg;
+}
+
+uint32_t DmaInstance::getWorkingDestAddress() {
+  return Dma::workingDesc(dma_channel)->DSTADDR.reg;
+}
+
+uint32_t DmaInstance::getWorkingSrcAddress() {
+  return Dma::workingDesc(dma_channel)->SRCADDR.reg;
+}
+
+uint32_t DmaInstance::getWorkingNextDesc() {
+  return Dma::workingDesc(dma_channel)->DESCADDR.reg;
 }

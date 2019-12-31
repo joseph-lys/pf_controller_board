@@ -161,3 +161,19 @@ void XSERCOM::clearSpiSslInterrupt() {
     sercom->SPI.INTFLAG.reg = SERCOM_SPI_INTFLAG_SSL;  // writing a 1 clears the bit
   }
 }
+
+void XSERCOM::clearSpiInterruptFlags() {
+  sercom->SPI.INTFLAG.reg = sercom->SPI.INTFLAG.reg;
+}
+
+void XSERCOM::disableSpiInterrruptSSL() {
+  sercom->SPI.INTENCLR.bit.SSL = 0;
+}
+
+void XSERCOM::enableSpiInterrruptSSL() {
+  sercom->SPI.INTENSET.bit.SSL = 1;
+}
+
+void XSERCOM::writeNowaitSPI(uint32_t value) {
+  sercom->SPI.DATA.reg = SERCOM_SPI_DATA_DATA(value);
+}

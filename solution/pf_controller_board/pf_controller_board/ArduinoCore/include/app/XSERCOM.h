@@ -45,38 +45,16 @@ public:
   Sercom* getSercomPointer();
   void initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pad, SercomSpiCharSize charSize, SercomDataOrder dataOrder);
   void initSPISlaveClock(SercomSpiClockMode clockMode);
-  inline void clearSpiSslInterrupt();
   
-  inline void clearSpiInterruptFlags() {
-    auto flags = sercom->SPI.INTFLAG.reg;
-    sercom->SPI.INTFLAG.reg = flags;
-  }
-
-  inline void noWaitDisableSPI() {
-    sercom->SPI.CTRLA.bit.ENABLE = 0;
-  }
-  inline void noWaitEnableSPI() {
-    sercom->SPI.CTRLA.bit.ENABLE = 1;
-  }
-  inline void waitSyncSPI() {
-    while(sercom->SPI.SYNCBUSY.reg) { }
-  }
+  void clearSpiSslInterrupt();
   
-  inline void disableRxSPI() {
-    sercom->SPI.CTRLB.bit.RXEN = 0;
-  }
+  void clearSpiInterruptFlags();
   
-  inline void enableRxSPI() {
-    sercom->SPI.CTRLB.bit.RXEN = 1;
-  }
+  void disableSpiInterrruptSSL();
   
-  inline void disableSpiInterrruptSSL() {
-    sercom->SPI.INTENCLR.bit.SSL = 1;
-  }
+  void enableSpiInterrruptSSL();
   
-  inline void enableSpiInterrruptSSL() {
-    sercom->SPI.INTENSET.bit.SSL = 1;
-  }
+  void writeNowaitSPI(uint32_t value);
 };
 
 

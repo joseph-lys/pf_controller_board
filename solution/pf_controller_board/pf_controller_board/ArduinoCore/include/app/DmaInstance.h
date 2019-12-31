@@ -46,63 +46,27 @@ class DmaInstance {
   
   // Start dmac channel
   void start();
-    
-  // Start dmac channel, does not wait for any sync
-  inline void noWaitEnable() {
-    __disable_irq();
-    DMAC->CHID.reg = DMAC_CHID_ID(dma_channel);
-    if (_has_callback) {
-      DMAC->CHINTENSET.reg = DMAC_CHINTFLAG_TERR | DMAC_CHINTFLAG_TCMPL;  
-    } else {
-      DMAC->CHINTENCLR.reg = DMAC->CHINTENSET.reg;
-    }
-    DMAC->CHCTRLA.reg = DMAC_CHCTRLA_ENABLE;
-    __enable_irq();
-  }
-  
-  // wait for dmac channel to be enabled
-  inline void waitEnabled() {
-    __disable_irq();
-    DMAC->CHID.reg = DMAC_CHID_ID(dma_channel);
-    while (!DMAC->CHCTRLA.bit.ENABLE) { }
-    __enable_irq();
-  }
   
   // Stop dmac channel
   void stop();
-  
-  // Disable dmac channel, does not wait
-  inline void noWaitDisable() {
-    __disable_irq();
-    DMAC->CHID.reg = DMAC_CHID_ID(dma_channel);
-    DMAC->CHCTRLA.bit.ENABLE = 0;
-    __enable_irq();
-  }
-  
-  // Software reset dmac channel, does not wait
-  inline void noWaitSoftwareReset() {
-    __disable_irq();
-    DMAC->CHID.reg = DMAC_CHID_ID(dma_channel);
-    DMAC->CHCTRLA.reg = DMAC_CHCTRLA_SWRST;
-    __enable_irq();
-  }
-  
-  // wait for dmac channel to be disabled/reseted
-  inline void waitDisabled() {
-    uint32_t cha;
-    for(;;) {
-      __disable_irq();
-      DMAC->CHID.reg = DMAC_CHID_ID(dma_channel);
-      cha = DMAC->CHCTRLA.reg | DMAC->CHSTATUS.reg;
-      __enable_irq();  
-      if(cha == 0) {
-        break;
-      }
-    }
-  }
     
   // Trigger a beat
   void triggerBeat();
+  
+  // Get First Descriptor
+  DmacDescriptor* getDescFirst();
+  
+  // Get BCNT value of working descriptor
+  uint32_t getWorkingCount();
+  
+  // Get Tx Address of working descriptor
+  uint32_t getWorkingDestAddress();
+
+  // Get Rx Address of working descriptor
+  uint32_t getWorkingSrcAddress();
+  
+  // Get Next Descriptor Address or working descriptor
+  uint32_t getWorkingNextDesc();
   
   // returns channel's pending flag
   inline bool isPending() {

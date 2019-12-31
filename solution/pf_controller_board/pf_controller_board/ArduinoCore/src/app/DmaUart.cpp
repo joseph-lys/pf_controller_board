@@ -91,17 +91,11 @@ void DmaContinuousReader::stop() {
 
 uint32_t DmaContinuousReader::getWrittenCount() {
   volatile uint32_t write, working_remaining, next_addr;
-  DmacDescriptor* volatile desc = Dma::workingDesc(dma_channel);
-  // do {
-  //  next_addr = desc->DSTADDR.reg;
-  //  write = write_;
-  //  working_remaining = desc->BTCNT.reg;
-  // } while(working_remaining != desc->BTCNT.reg || write != write_ || next_addr != desc->DSTADDR.reg || dma_.isPending());
   do {
-    next_addr = desc->DSTADDR.reg;
-    working_remaining = desc->BTCNT.reg;
+    next_addr = dma_.getWorkingNextDesc();
+    working_remaining = dma_.getWorkingCount();
     write = write_;
-  } while(working_remaining != desc->BTCNT.reg || next_addr != desc->DSTADDR.reg);
+  } while(working_remaining != dma_.getWorkingCount() || next_addr != dma_.getWorkingNextDesc());
   if(working_remaining < 1) {
     working_remaining = 1;
   }
