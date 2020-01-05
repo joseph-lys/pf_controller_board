@@ -56,6 +56,9 @@ class DmaInstance {
   // Get First Descriptor
   DmacDescriptor* getDescFirst();
   
+  // Get Working Descriptor
+  DmacDescriptor* getDescWorking();
+  
   // Get BCNT value of working descriptor
   uint32_t getWorkingCount();
   
@@ -67,6 +70,10 @@ class DmaInstance {
   
   // Get Next Descriptor Address or working descriptor
   uint32_t getWorkingNextDesc();
+  
+  void suspendChannel();
+  
+  void resumeChannel();
   
   // returns channel's pending flag
   inline bool isPending() {

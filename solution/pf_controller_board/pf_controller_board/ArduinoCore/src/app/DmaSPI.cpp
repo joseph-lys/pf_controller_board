@@ -87,7 +87,6 @@ static SercomSpiRXSlavePad SPISlaveEquivalentRxPad(SercomSpiTXPad original_txpad
 
 DmaSPISlaveClass::DmaSPISlaveClass(XSERCOM *p_sercom,uint8_t dma_rx_channel, uint8_t dma_tx_channel, uint8_t uc_pinMISO, uint8_t uc_pinSCK, uint8_t uc_pinMOSI, uint8_t uc_pinSS, SercomSpiTXSlavePad PadTx, SercomSpiRXSlavePad PadRx) 
 : 
-settings(SPISettings(0, MSBFIRST, SPI_MODE0)),
 dma_rx(dma_rx_channel, nullptr), dma_tx(dma_tx_channel, nullptr),
 _data_register(reinterpret_cast<uint32_t>(&p_sercom->getSercomPointer()->SPI.DATA.reg))
 {
@@ -110,6 +109,8 @@ _data_register(reinterpret_cast<uint32_t>(&p_sercom->getSercomPointer()->SPI.DAT
   _tx_buffer = new uint8_t[DMA_SPI_BUFFER_SIZE]{0};
   _rx_buffer = new uint8_t[DMA_SPI_BUFFER_SIZE]{0};
   _rw_buffer = new uint8_t[DMA_SPI_BUFFER_SIZE]{0};
+    
+  _prev_rem = 0;
 }
 
 DmaSPISlaveClass::~DmaSPISlaveClass() {
@@ -131,24 +132,28 @@ void DmaSPISlaveClass::begin()
   pinPeripheral(_uc_pinMosi, g_APinDescription[_uc_pinMosi].ulPinType);
   pinPeripheral(_uc_pinSS, g_APinDescription[_uc_pinSS].ulPinType);
 
-  // config(settings);
-  // config(DEFAULT_SPI_SETTINGS);
-  
-  config(SPISettings(1000000, MSBFIRST, SPI_MODE0));
-  
-  // configure DMA
   dma_tx.stop();
   dma_rx.stop();
-  dma_tx.setupTxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
-  dma_rx.setupRxDescFirst(_data_register, const_cast<uint8_t*>(_w_buffer), buffer_size);
-  dma_tx.setupTxConfig(_p_sercom->getSercomId(), 0);  // setup Tx with priority 0
-  dma_rx.setupRxConfig(_p_sercom->getSercomId(), 0);  // setup Tx with priority 0
+
+  // config(settings);
+  config();
+  // _p_sercom->disableSPI();
+  // config(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+  
+  // configure DMA
+  dma_tx.setupTxDescFirst(_data_register, const_cast<uint8_t*>(&_w_buffer[0]), buffer_size);
+  dma_rx.setupRxDescFirst(_data_register, const_cast<uint8_t*>(&_w_buffer[0]), buffer_size);
   desc = dma_tx.getDescFirst();
   desc->DESCADDR.reg = reinterpret_cast<uint32_t>(desc);  // point back to itself, never ending loop
   desc = dma_rx.getDescFirst();
   desc->DESCADDR.reg = reinterpret_cast<uint32_t>(desc);  // point back to itself, never ending loop
+  dma_tx.setupTxConfig(_p_sercom->getSercomId(), 0);  // setup Tx with priority 0
+  dma_rx.setupRxConfig(_p_sercom->getSercomId(), 0);  // setup Rx with priority 0
+  
   dma_tx.start();
   dma_rx.start();
+  
+  _p_sercom->enableSPI();
 }
 
 void DmaSPISlaveClass::init()
@@ -158,57 +163,21 @@ void DmaSPISlaveClass::init()
   initialized = true;
 }
 
-void DmaSPISlaveClass::config(SPISettings settings)
+void DmaSPISlaveClass::config()
 {
-  if (this->settings != settings) {
-    this->settings = settings;
-    _p_sercom->disableSPI();
+  _p_sercom->disableSPI();
 
-    _p_sercom->initSPISlave(_padTx, _padRx, SPI_CHAR_SIZE_8_BITS, settings.bitOrder);
-    _p_sercom->initSPISlaveClock(settings.dataMode);
-    _p_sercom->enableSPI();
-  }
+  _p_sercom->initSPISlave(_padTx, _padRx, SPI_CHAR_SIZE_8_BITS, LSB_FIRST);
+  _p_sercom->initSPISlaveClock(SERCOM_SPI_MODE_0);
+  // _p_sercom->enableSPI();
 }
 
 void DmaSPISlaveClass::end()
 {
+  dma_tx.stop();
+  dma_rx.stop();
   _p_sercom->resetSPI();
   initialized = false;
-}
-
-
-void DmaSPISlaveClass::setBitOrder(BitOrder order)
-{
-  if (order == LSBFIRST) {
-    _p_sercom->setDataOrderSPI(LSB_FIRST);
-  } else {
-    _p_sercom->setDataOrderSPI(MSB_FIRST);
-  }
-}
-
-void DmaSPISlaveClass::setDataMode(uint8_t mode)
-{
-  switch (mode)
-  {
-    case SPI_MODE0:
-      _p_sercom->setClockModeSPI(SERCOM_SPI_MODE_0);
-      break;
-
-    case SPI_MODE1:
-      _p_sercom->setClockModeSPI(SERCOM_SPI_MODE_1);
-      break;
-
-    case SPI_MODE2:
-      _p_sercom->setClockModeSPI(SERCOM_SPI_MODE_2);
-      break;
-
-    case SPI_MODE3:
-      _p_sercom->setClockModeSPI(SERCOM_SPI_MODE_3);
-      break;
-
-    default:
-      break;
-  }
 }
 
 uint8_t* DmaSPISlaveClass::getTxDataPtr() {
@@ -239,48 +208,51 @@ uint8_t* DmaSPISlaveClass::getRxDataPtr() {
   return ptr;
 }
 
-void DmaSPISlaveClass::dataIn() {
-  uint32_t x; 
+void DmaSPISlaveClass::endTransactionInterrupt() {
+  uint32_t cur_rem; 
   uint32_t idx;
-  x = 0;
+  cur_rem = 0;
   while(dma_rx.isPending() || dma_rx.isBusy()) { }
-  while (x == 0) {  // assuming that dma has started, working count should not stay 0 (possibly 0 only if loading desc)
-    x = dma_rx.getWorkingCount();
+  do {  // assuming that dma has started, working count should not stay 0 (possibly 0 only if loading desc)
+    cur_rem = dma_rx.getWorkingCount();
+  } while( cur_rem == 0 );
+  
+  // dma_rx.suspendChannel();
+  idx = _prev_rem;
+  for (uint32_t i=0; i<buffer_size; i++) {
+    if (idx != cur_rem) {
+      _rx_buffer[i] = _w_buffer[idx];
+    } else { break; }
+    idx = (idx + 1) & buffer_mask;
   }
-  x = buffer_size - x;
-  for (uint32_t i=1; i<buffer_size; i++) {
-    idx = (i + x) & buffer_mask;
-    _rx_buffer[i] = _w_buffer[idx];
-  }
+  // dma_rx.resumeChannel();
+  _prev_rem = cur_rem;
   _rx_pending = true;
+  
+  _p_sercom->clearSpiInterruptFlags();
 }
 
-void DmaSPISlaveClass::dataOut() {
+void DmaSPISlaveClass::startTransactionInterrupt() {
+  
+  int i;
+  _tx_buffer[i]++;  // test load
+  for (i=1; i<buffer_size; i++) {  // test load
+    _tx_buffer[i] = i;
+  } 
+  
+  
+  
   uint32_t x;
   uint32_t idx;
-  x = 0;
   while(dma_tx.isPending() || dma_tx.isBusy()) { }
-  while (x == 0) {  // assuming that dma has started, working count should not stay 0 (possibly 0 only if loading desc)
+  do {  // assuming that dma has started, working count should not stay 0 (possibly 0 only if loading desc)
     x = dma_tx.getWorkingCount();   
-  }
+  } while (x == 0);
   x = buffer_size - x;
-  _p_sercom->transferDataSPI(_w_buffer[x]);  // write first byte
-  for (uint32_t i=1; i<buffer_size; i++) {
+  // _p_sercom->transferDataSPI(_w_buffer[x]);  // write first byte
+  for (uint32_t i=0; i<buffer_size; i++) {
     idx = (i + x) & buffer_mask;
     _w_buffer[idx] = _tx_buffer[i];
-  }
-}
-void DmaSPISlaveClass::ssInterrupt() {    
-  auto ss = PORT->Group[g_APinDescription[_uc_pinSS].ulPort].IN.reg & PORT->Group[g_APinDescription[_uc_pinSS].ulPort].IN.reg;
-
-  _p_sercom->clearSpiInterruptFlags();
-  if(ss) { // rising edge (end of transfer)
-    dataIn();
-  } else {  // falling edge (start of transfer)
-    dataOut();
-    for (int i=0; i<buffer_size; i++) {
-      _w_buffer[i] = i;
-    }
   }
   _p_sercom->clearSpiInterruptFlags();
 }

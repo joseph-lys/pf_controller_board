@@ -96,7 +96,6 @@ void XSERCOM::initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pa
     IdNvic = SERCOM5_IRQn;
   }
   #endif // SERCOM5
-
   if ( IdNvic == PendSV_IRQn )
   {
     // We got a problem here
@@ -105,7 +104,7 @@ void XSERCOM::initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pa
 
   // Setting NVIC
   NVIC_DisableIRQ(IdNvic);
-  NVIC_SetPriority (IdNvic, 0);  /* set Priority*/
+  NVIC_SetPriority(IdNvic, 0);  /* set Priority 0 */
   
   GCLK->CLKCTRL.reg =  GCLK_CLKCTRL_ID( clockId ) | // Sercom Clock Id
                       GCLK_CLKCTRL_GEN_GCLK0 | // Generic Clock Generator 0 is source
@@ -113,7 +112,7 @@ void XSERCOM::initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pa
    while ( GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY ) {}  // Wait for sync
   // connect sercom slow clock
   GCLK->CLKCTRL.reg =  GCLK_CLKCTRL_ID_SERCOMX_SLOW | // Generic Clock 13 (SERCOMx Slow)
-                       GCLK_CLKCTRL_GEN_GCLK3 | // Generic Clock Generator 0 is source
+                       GCLK_CLKCTRL_GEN_GCLK2 | // Generic Clock Generator 0 is source
                        GCLK_CLKCTRL_CLKEN ;
   while ( GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY ) {}  // Wait for sync
   
@@ -121,7 +120,7 @@ void XSERCOM::initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pa
   sercom->SPI.CTRLA.reg =	SERCOM_SPI_CTRLA_MODE_SPI_SLAVE |
     SERCOM_SPI_CTRLA_DOPO(tx_pad) |
     SERCOM_SPI_CTRLA_DIPO(rx_pad) |
-    dataOrder << SERCOM_SPI_CTRLA_DORD_Pos;
+    (dataOrder << SERCOM_SPI_CTRLA_DORD_Pos);
 
   //Setting the CTRLB register
   sercom->SPI.CTRLB.reg = SERCOM_SPI_CTRLB_CHSIZE(charSize) | 
@@ -135,31 +134,52 @@ void XSERCOM::initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pa
 
 void XSERCOM::initSPISlaveClock(SercomSpiClockMode clockMode)
 {
-  //Extract data from clockMode
-  int cpha, cpol;
-
-  if((clockMode & (0x1ul)) == 0 )
-    cpha = 0;
-  else
-    cpha = 1;
-
-  if((clockMode & (0x2ul)) == 0)
-    cpol = 0;
-  else
-    cpol = 1;
-
-  //Setting the CTRLA register
-  sercom->SPI.CTRLA.reg |=	( cpha << SERCOM_SPI_CTRLA_CPHA_Pos ) |
-                            ( cpol << SERCOM_SPI_CTRLA_CPOL_Pos );
-  
-  //Synchronous arithmetic
-  sercom->SPI.BAUD.reg = 0;
-}
-
-void XSERCOM::clearSpiSslInterrupt() {
-  if(sercom->SPI.INTFLAG.bit.SSL) {
-    sercom->SPI.INTFLAG.reg = SERCOM_SPI_INTFLAG_SSL;  // writing a 1 clears the bit
+//   //Extract data from clockMode
+//   int cpha, cpol;
+// 
+//   if((clockMode & (0x1ul)) == 0 )
+//     cpha = 0;
+//   else
+//     cpha = 1;
+// 
+//   if((clockMode & (0x2ul)) == 0)
+//     cpol = 0;
+//   else
+//     cpol = 1;
+// 
+//   //Setting the CTRLA register
+//   sercom->SPI.CTRLA.reg |=	( cpha << SERCOM_SPI_CTRLA_CPHA_Pos ) |
+//                             ( cpol << SERCOM_SPI_CTRLA_CPOL_Pos );
+//   
+//   //Synchronous arithmetic
+//   sercom->SPI.BAUD.reg = 0;
+  uint32_t mode;
+  switch(clockMode) {
+    case SERCOM_SPI_MODE_0:
+      sercom->SPI.CTRLA.bit.CPOL = 0;
+      sercom->SPI.CTRLA.bit.CPHA = 0;
+      sercom->SPI.CTRLA.bit.MODE = SERCOM_SPI_MODE_0;
+      break;
+    case SERCOM_SPI_MODE_1:
+      sercom->SPI.CTRLA.bit.CPOL = 0;
+      sercom->SPI.CTRLA.bit.CPHA = 1;
+      sercom->SPI.CTRLA.bit.MODE = SERCOM_SPI_MODE_1;
+      break;
+    case SERCOM_SPI_MODE_2:
+      sercom->SPI.CTRLA.bit.CPOL = 1;
+      sercom->SPI.CTRLA.bit.CPHA = 0;
+      sercom->SPI.CTRLA.bit.MODE = SERCOM_SPI_MODE_1;
+      break;
+    case SERCOM_SPI_MODE_3:
+      sercom->SPI.CTRLA.bit.CPOL = 1;
+      sercom->SPI.CTRLA.bit.CPHA = 1;
+      sercom->SPI.CTRLA.bit.MODE = SERCOM_SPI_MODE_3;
+      break;
+    default:
+      while (1) { } // problem
+      break;
   }
+  sercom->SPI.BAUD.reg = 0;  //
 }
 
 void XSERCOM::clearSpiInterruptFlags() {

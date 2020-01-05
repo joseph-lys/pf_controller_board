@@ -67,7 +67,9 @@ void Dma::irqHandler() {
   dmac->CHINTFLAG.reg = int_flag;
   __enable_irq();
   dmac->INTPEND.bit.ID = 11;  // id can only go downwards, set to highest
-  channel_callbacks[id]->callback(int_flag);
+  if (channel_callbacks[id] != nullptr) {
+    channel_callbacks[id]->callback(int_flag);
+  }    
 }
 
 void Dma::swTrigger(uint8_t channel){

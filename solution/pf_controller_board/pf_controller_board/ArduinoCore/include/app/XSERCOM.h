@@ -46,8 +46,6 @@ public:
   void initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pad, SercomSpiCharSize charSize, SercomDataOrder dataOrder);
   void initSPISlaveClock(SercomSpiClockMode clockMode);
   
-  void clearSpiSslInterrupt();
-  
   void clearSpiInterruptFlags();
   
   void disableSpiInterrruptSSL();

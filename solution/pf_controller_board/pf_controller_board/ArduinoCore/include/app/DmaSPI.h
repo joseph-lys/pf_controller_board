@@ -49,72 +49,6 @@
   #define SPI_MIN_CLOCK_DIVIDER (uint8_t)(1 + ((F_CPU - 1) / 12000000))
 #endif
 
-class SPISettings {
-  public:
-  SPISettings(uint32_t clock, BitOrder bitOrder, uint8_t dataMode) {
-    if (__builtin_constant_p(clock)) {
-      init_AlwaysInline(clock, bitOrder, dataMode);
-    } else {
-      init_MightInline(clock, bitOrder, dataMode);
-    }
-  }
-
-  // Default speed set to 4MHz, SPI mode set to MODE 0 and Bit order set to MSB first.
-  SPISettings() { init_AlwaysInline(4000000, MSBFIRST, SPI_MODE0); }
-
-  bool operator==(const SPISettings& rhs) const
-  {
-    if ((this->clockFreq == rhs.clockFreq) &&
-        (this->bitOrder == rhs.bitOrder) &&
-        (this->dataMode == rhs.dataMode)) {
-      return true;
-    }
-    return false;
-  }
-
-  bool operator!=(const SPISettings& rhs) const
-  {
-    return !(*this == rhs);
-  }
-
-  uint32_t getClockFreq() const {return clockFreq;}
-  uint8_t getDataMode() const {return (uint8_t)dataMode;}
-  BitOrder getBitOrder() const {return (bitOrder == MSB_FIRST ? MSBFIRST : LSBFIRST);}
-
-  private:
-  void init_MightInline(uint32_t clock, BitOrder bitOrder, uint8_t dataMode) {
-    init_AlwaysInline(clock, bitOrder, dataMode);
-  }
-
-  void init_AlwaysInline(uint32_t clock, BitOrder bitOrder, uint8_t dataMode) __attribute__((__always_inline__)) {
-    this->clockFreq = (clock >= (F_CPU / SPI_MIN_CLOCK_DIVIDER) ? F_CPU / SPI_MIN_CLOCK_DIVIDER : clock);
-
-    this->bitOrder = (bitOrder == MSBFIRST ? MSB_FIRST : LSB_FIRST);
-
-    switch (dataMode)
-    {
-      case SPI_MODE0:
-        this->dataMode = SERCOM_SPI_MODE_0; break;
-      case SPI_MODE1:
-        this->dataMode = SERCOM_SPI_MODE_1; break;
-      case SPI_MODE2:
-        this->dataMode = SERCOM_SPI_MODE_2; break;
-      case SPI_MODE3:
-        this->dataMode = SERCOM_SPI_MODE_3; break;
-      default:
-        this->dataMode = SERCOM_SPI_MODE_0; break;
-    }
-  }
-
-  uint32_t clockFreq;
-  SercomSpiClockMode dataMode;
-  SercomDataOrder bitOrder;
-
-  friend class DmaSPISlaveClass;
-};
-
-const SPISettings DEFAULT_SPI_SETTINGS = SPISettings();
-
 
 class DmaSPISlaveClass {
   // static_assert(uint32_t(DMA_SPI_BUFFER_SIZE) & uint32_t(DMA_SPI_BUFFER_SIZE - 1) == 0, 
@@ -127,8 +61,6 @@ class DmaSPISlaveClass {
     buffer_size = DMA_SPI_BUFFER_SIZE,
     buffer_mask = DMA_SPI_BUFFER_SIZE - 1
   };
-  void setBitOrder(BitOrder order);
-  void setDataMode(uint8_t uc_mode);
   void begin();
   private:
   const uint32_t _data_register;
@@ -137,15 +69,15 @@ class DmaSPISlaveClass {
   volatile bool _rx_pending;
   volatile uint8_t* volatile _tw_buffer;
   volatile uint8_t* volatile _tx_buffer;
-  volatile uint8_t _w_buffer[DmaSPISlaveClass::buffer_size];
+  uint8_t volatile _w_buffer[DmaSPISlaveClass::buffer_size];
   volatile uint8_t* volatile _rx_buffer;
   volatile uint8_t* volatile _rw_buffer;
   
+  uint32_t _prev_rem;
+  
   void init();
-  void config(SPISettings settings);
+  void config();
   void end();
-  void dataIn();
-  void dataOut();
   
   XSERCOM *_p_sercom;
   uint8_t _uc_pinMiso;
@@ -156,16 +88,13 @@ class DmaSPISlaveClass {
   SercomSpiTXSlavePad _padTx;
   SercomSpiRXSlavePad _padRx;
 
-  SPISettings settings;
   DmaInstance dma_rx;
   DmaInstance dma_tx;
     
   public:
-  // this is called from within SERCOMX_Handler
-  //   new data goes to pending_rx, 
-  //   pending_tx is cleared.
-  //   dma channels are stopped.
-  void ssInterrupt();
+  // Call when CS changed
+  void startTransactionInterrupt();
+  void endTransactionInterrupt();
 
   // get current TxDataPtr, data will not be queued for transfer until queueTxData is called
   uint8_t* getTxDataPtr();
