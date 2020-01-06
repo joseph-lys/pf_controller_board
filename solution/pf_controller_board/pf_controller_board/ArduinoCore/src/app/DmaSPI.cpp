@@ -88,7 +88,7 @@ static SercomSpiRXSlavePad SPISlaveEquivalentRxPad(SercomSpiTXPad original_txpad
 DmaSPISlaveClass::DmaSPISlaveClass(XSERCOM *p_sercom,uint8_t dma_rx_channel, uint8_t dma_tx_channel, uint8_t uc_pinMISO, uint8_t uc_pinSCK, uint8_t uc_pinMOSI, uint8_t uc_pinSS, SercomSpiTXSlavePad PadTx, SercomSpiRXSlavePad PadRx) 
 : 
 dma_rx(dma_rx_channel, nullptr), dma_tx(dma_tx_channel, nullptr),
-_data_register(reinterpret_cast<uint32_t>(&p_sercom->getSercomPointer()->SPI.DATA.reg))
+_data_register(p_sercom->dataAddressSPI)
 {
   initialized = false;
   assert(p_sercom != nullptr);
@@ -141,19 +141,22 @@ void DmaSPISlaveClass::begin()
   // config(SPISettings(1000000, MSBFIRST, SPI_MODE0));
   
   // configure DMA
-  dma_tx.setupTxDescFirst(_data_register, const_cast<uint8_t*>(&_w_buffer[0]), buffer_size);
-  dma_rx.setupRxDescFirst(_data_register, const_cast<uint8_t*>(&_w_buffer[0]), buffer_size);
+  uint8_t* p_work = const_cast<uint8_t*>(&_w_buffer[0]);
+  dma_tx.setupTxDescFirst(_data_register, p_work, buffer_size);
+  dma_rx.setupRxDescFirst(_data_register, p_work, buffer_size);
   desc = dma_tx.getDescFirst();
   desc->DESCADDR.reg = reinterpret_cast<uint32_t>(desc);  // point back to itself, never ending loop
   desc = dma_rx.getDescFirst();
   desc->DESCADDR.reg = reinterpret_cast<uint32_t>(desc);  // point back to itself, never ending loop
-  dma_tx.setupTxConfig(_p_sercom->getSercomId(), 0);  // setup Tx with priority 0
+  dma_tx.setupTxConfig(_p_sercom->getSercomId(), 0);  // setup Tx with priority 1
   dma_rx.setupRxConfig(_p_sercom->getSercomId(), 0);  // setup Rx with priority 0
+  
   
   dma_tx.start();
   dma_rx.start();
   
   _p_sercom->enableSPI();
+  
 }
 
 void DmaSPISlaveClass::init()
@@ -167,8 +170,8 @@ void DmaSPISlaveClass::config()
 {
   _p_sercom->disableSPI();
 
-  _p_sercom->initSPISlave(_padTx, _padRx, SPI_CHAR_SIZE_8_BITS, LSB_FIRST);
-  _p_sercom->initSPISlaveClock(SERCOM_SPI_MODE_0);
+  _p_sercom->initSPISlave(_padTx, _padRx, SPI_CHAR_SIZE_8_BITS, MSB_FIRST);
+  _p_sercom->initSPISlaveClock(SERCOM_SPI_MODE_2);
   // _p_sercom->enableSPI();
 }
 
@@ -210,6 +213,7 @@ uint8_t* DmaSPISlaveClass::getRxDataPtr() {
 
 void DmaSPISlaveClass::endTransactionInterrupt() {
   uint32_t cur_rem; 
+  uint32_t cur_last;
   uint32_t idx;
   cur_rem = 0;
   while(dma_rx.isPending() || dma_rx.isBusy()) { }
@@ -219,10 +223,13 @@ void DmaSPISlaveClass::endTransactionInterrupt() {
   
   // dma_rx.suspendChannel();
   idx = _prev_rem;
+  cur_last = buffer_size - cur_rem - 1;
   for (uint32_t i=0; i<buffer_size; i++) {
-    if (idx != cur_rem) {
-      _rx_buffer[i] = _w_buffer[idx];
-    } else { break; }
+    _rx_buffer[i] = _w_buffer[idx];
+    if (idx == cur_last) {
+ 
+      break;
+    }
     idx = (idx + 1) & buffer_mask;
   }
   // dma_rx.resumeChannel();
@@ -257,5 +264,5 @@ void DmaSPISlaveClass::startTransactionInterrupt() {
   _p_sercom->clearSpiInterruptFlags();
 }
 
-
-DmaSPISlaveClass SPI (&PERIPH_SPI, 0, 1,  PIN_SPI_MISO,  PIN_SPI_SCK,  PIN_SPI_MOSI, SS, SPISlaveEquivalentTxPad(PAD_SPI_TX, PAD_SPI_RX), SPISlaveEquivalentRxPad(PAD_SPI_TX, PAD_SPI_RX));
+static XSERCOM SercomSPI{SERCOM4};
+DmaSPISlaveClass SPI (&SercomSPI, 0, 1,  PIN_SPI_MISO,  PIN_SPI_SCK,  PIN_SPI_MOSI, SS, SPISlaveEquivalentTxPad(PAD_SPI_TX, PAD_SPI_RX), SPISlaveEquivalentRxPad(PAD_SPI_TX, PAD_SPI_RX));

@@ -41,6 +41,10 @@ public:
   inline IRQn_Type getIRQn() {
     return irqn_;
   }
+  const uint32_t dataAddressI2CM;
+  const uint32_t dataAddressI2CS;
+  const uint32_t dataAddressUSART;
+  const uint32_t dataAddressSPI;
   
   Sercom* getSercomPointer();
   void initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pad, SercomSpiCharSize charSize, SercomDataOrder dataOrder);

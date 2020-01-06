@@ -46,7 +46,12 @@ static IRQn_Type getIRQnInternal(Sercom* sercom) {
 }
 
 XSERCOM::XSERCOM(Sercom* s) 
-: SERCOM(s), sercom_id_(getSercomIdInternal(s)), irqn_(getIRQnInternal(s)) {
+: SERCOM(s), sercom_id_(getSercomIdInternal(s)), irqn_(getIRQnInternal(s)),
+dataAddressI2CM(reinterpret_cast<uint32_t>(&(s->I2CM.DATA.reg))),
+dataAddressI2CS(reinterpret_cast<uint32_t>(&(s->I2CS.DATA.reg))),
+dataAddressUSART(reinterpret_cast<uint32_t>(&(s->USART.DATA.reg))),
+dataAddressSPI(reinterpret_cast<uint32_t>(&(s->SPI.DATA.reg)))
+{
   
 }
 
@@ -158,22 +163,18 @@ void XSERCOM::initSPISlaveClock(SercomSpiClockMode clockMode)
     case SERCOM_SPI_MODE_0:
       sercom->SPI.CTRLA.bit.CPOL = 0;
       sercom->SPI.CTRLA.bit.CPHA = 0;
-      sercom->SPI.CTRLA.bit.MODE = SERCOM_SPI_MODE_0;
       break;
     case SERCOM_SPI_MODE_1:
       sercom->SPI.CTRLA.bit.CPOL = 0;
       sercom->SPI.CTRLA.bit.CPHA = 1;
-      sercom->SPI.CTRLA.bit.MODE = SERCOM_SPI_MODE_1;
       break;
     case SERCOM_SPI_MODE_2:
       sercom->SPI.CTRLA.bit.CPOL = 1;
       sercom->SPI.CTRLA.bit.CPHA = 0;
-      sercom->SPI.CTRLA.bit.MODE = SERCOM_SPI_MODE_1;
       break;
     case SERCOM_SPI_MODE_3:
       sercom->SPI.CTRLA.bit.CPOL = 1;
       sercom->SPI.CTRLA.bit.CPHA = 1;
-      sercom->SPI.CTRLA.bit.MODE = SERCOM_SPI_MODE_3;
       break;
     default:
       while (1) { } // problem
