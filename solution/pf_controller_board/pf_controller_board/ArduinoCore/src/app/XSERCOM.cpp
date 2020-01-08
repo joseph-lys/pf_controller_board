@@ -117,7 +117,7 @@ void XSERCOM::initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pa
    while ( GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY ) {}  // Wait for sync
   // connect sercom slow clock
   GCLK->CLKCTRL.reg =  GCLK_CLKCTRL_ID_SERCOMX_SLOW | // Generic Clock 13 (SERCOMx Slow)
-                       GCLK_CLKCTRL_GEN_GCLK2 | // Generic Clock Generator 0 is source
+                       GCLK_CLKCTRL_GEN_GCLK0 | // Generic Clock Generator 0 is source
                        GCLK_CLKCTRL_CLKEN ;
   while ( GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY ) {}  // Wait for sync
   

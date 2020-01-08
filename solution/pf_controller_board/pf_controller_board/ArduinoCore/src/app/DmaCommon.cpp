@@ -108,7 +108,7 @@ void Dma::init() {
                    DMAC_CTRL_LVLEN2;
   dmac->QOSCTRL.bit.DQOS = DMAC_QOSCTRL_DQOS_HIGH_Val;  // DATA QoS
   dmac->QOSCTRL.bit.FQOS = DMAC_QOSCTRL_FQOS_HIGH_Val;  // Fetch QoS
-  dmac->QOSCTRL.bit.WRBQOS = DMAC_QOSCTRL_WRBQOS_LOW_Val;  // Writeback WQoS
+  dmac->QOSCTRL.bit.WRBQOS = DMAC_QOSCTRL_WRBQOS_HIGH_Val;  // Writeback WQoS
   
   dmac->PRICTRL0.reg = 0;  // static priority levels
   dmac->CTRL.bit.DMAENABLE = 1;
