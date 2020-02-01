@@ -91,17 +91,11 @@ void DmaContinuousReader::stop() {
 
 uint32_t DmaContinuousReader::getWrittenCount() {
   volatile uint32_t write, working_remaining, next_addr;
-  DmacDescriptor* volatile desc = Dma::workingDesc(dma_channel);
-  // do {
-  //  next_addr = desc->DSTADDR.reg;
-  //  write = write_;
-  //  working_remaining = desc->BTCNT.reg;
-  // } while(working_remaining != desc->BTCNT.reg || write != write_ || next_addr != desc->DSTADDR.reg || dma_.isPending());
   do {
-    next_addr = desc->DSTADDR.reg;
-    working_remaining = desc->BTCNT.reg;
+    next_addr = dma_.getWorkingNextDesc();
+    working_remaining = dma_.getWorkingCount();
     write = write_;
-  } while(working_remaining != desc->BTCNT.reg || next_addr != desc->DSTADDR.reg);
+  } while(working_remaining != dma_.getWorkingCount() || next_addr != dma_.getWorkingNextDesc());
   if(working_remaining < 1) {
     working_remaining = 1;
   }
@@ -175,7 +169,7 @@ void DmaUart::begin(unsigned long baudrate, uint16_t config) {
   sercom->initUART(UART_INT_CLOCK, SAMPLE_RATE_x16, baudrate);
   sercom->initFrame(extractCharSize(config), LSB_FIRST, extractParity(config), extractNbStopBit(config));
   sercom->initPads(uc_padTX, uc_padRX);
-  NVIC_DisableIRQ(SERCOM2_IRQn);
+  NVIC_DisableIRQ(sercom->getIRQn());
   // clear some interrupts
   SERCOM2->USART.INTENCLR.bit.CTSIC = 1;
   SERCOM2->USART.INTENCLR.bit.DRE = 1;
@@ -184,6 +178,8 @@ void DmaUart::begin(unsigned long baudrate, uint16_t config) {
   SERCOM2->USART.INTENCLR.bit.RXS = 1;
   // SERCOM2->USART.INTENCLR.bit.TXC = 1;
   SERCOM2->USART.INTENSET.bit.TXC = 1;
+  NVIC_SetPriority(sercom->getIRQn(), 2);
+  NVIC_EnableIRQ(sercom->getIRQn());
   sercom->enableUART();
   
   reader.start();

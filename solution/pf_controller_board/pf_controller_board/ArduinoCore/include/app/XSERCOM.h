@@ -11,11 +11,52 @@
 
 #include "SERCOM.h"
 
+typedef enum
+{
+	SPI_SLAVE_PAD_0_SCK_1_SS_2 = 0,
+	SPI_SLAVE_PAD_2_SCK_3_SS_1,
+	SPI_SLAVE_PAD_3_SCK_1_SS_2,
+	SPI_SLAVE_PAD_0_SCK_3_SS_1
+} SercomSpiTXSlavePad;
+
+typedef enum
+{
+	SPI_SLAVE_RX_PAD_0 = 0,
+	SPI_SLAVE_RX_PAD_1,
+	SPI_SLAVE_RX_PAD_2,
+	SPI_SLAVE_RX_PAD_3
+} SercomSpiRXSlavePad;
+
 class XSERCOM : public SERCOM {
+private:
+  const uint8_t sercom_id_;
+  const IRQn_Type irqn_;
 public:
   XSERCOM(Sercom* s);
-  uint8_t getSercomId();
+  
+  inline uint8_t getSercomId() {
+    return sercom_id_;
+  }
+  
+  inline IRQn_Type getIRQn() {
+    return irqn_;
+  }
+  const uint32_t dataAddressI2CM;
+  const uint32_t dataAddressI2CS;
+  const uint32_t dataAddressUSART;
+  const uint32_t dataAddressSPI;
+  
   Sercom* getSercomPointer();
+  void initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pad, SercomSpiCharSize charSize, SercomDataOrder dataOrder);
+  void initSPISlaveClock(SercomSpiClockMode clockMode);
+  
+  void clearSpiInterruptFlags();
+  
+  void disableSpiInterrruptSSL();
+  
+  void enableSpiInterrruptSSL();
+  
+  void writeNowaitSPI(uint32_t value);
 };
 
 

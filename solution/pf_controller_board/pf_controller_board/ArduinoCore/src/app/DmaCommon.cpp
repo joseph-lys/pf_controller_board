@@ -26,14 +26,19 @@ void Dma::defaultDesc(DmacDescriptor& desc) {
   desc.BTCNT.reg = 0;
   
   // Set descriptor for TX
-  desc.BTCTRL.bit.VALID = 1;
-  desc.BTCTRL.bit.EVOSEL = DMAC_BTCTRL_EVOSEL_DISABLE_Val;
-  desc.BTCTRL.bit.BLOCKACT = DMAC_BTCTRL_BLOCKACT_INT_Val;
-  desc.BTCTRL.bit.BEATSIZE = DMAC_BTCTRL_BEATSIZE_BYTE_Val;
-  desc.BTCTRL.bit.SRCINC = 0;
-  desc.BTCTRL.bit.DSTINC = 0;  
-  desc.BTCTRL.bit.STEPSEL = 0;
-  desc.BTCTRL.bit.STEPSIZE = DMAC_BTCTRL_STEPSIZE_X1_Val;
+  // desc.BTCTRL.bit.VALID = 1;
+  // desc.BTCTRL.bit.EVOSEL = DMAC_BTCTRL_EVOSEL_DISABLE_Val;
+  // desc.BTCTRL.bit.BLOCKACT = DMAC_BTCTRL_BLOCKACT_INT_Val;
+  // desc.BTCTRL.bit.BEATSIZE = DMAC_BTCTRL_BEATSIZE_BYTE_Val;
+  // desc.BTCTRL.bit.SRCINC = 0;
+  // desc.BTCTRL.bit.DSTINC = 0;  
+  // desc.BTCTRL.bit.STEPSEL = 0;
+  // desc.BTCTRL.bit.STEPSIZE = DMAC_BTCTRL_STEPSIZE_X1_Val;
+  desc.BTCTRL.reg = DMAC_BTCTRL_VALID |
+                    DMAC_BTCTRL_EVOSEL_DISABLE |
+                    DMAC_BTCTRL_BLOCKACT_INT |
+                    DMAC_BTCTRL_BEATSIZE_BYTE |
+                    DMAC_BTCTRL_STEPSIZE_X1;
   desc.BTCNT.reg = 0;  // undetermined until transfer initiated
   desc.SRCADDR.reg = 0;  // undetermined until transfer initiated  
   desc.DESCADDR.reg = 0; 
@@ -62,49 +67,32 @@ void Dma::irqHandler() {
   dmac->CHINTFLAG.reg = int_flag;
   __enable_irq();
   dmac->INTPEND.bit.ID = 11;  // id can only go downwards, set to highest
-  channel_callbacks[id]->callback(int_flag);
+  if (channel_callbacks[id] != nullptr) {
+    channel_callbacks[id]->callback(int_flag);
+  }    
 }
 
 void Dma::swTrigger(uint8_t channel){
   Dmac* dmac = DMAC;
-  switch(channel) {
-    case 0:
-      dmac->SWTRIGCTRL.bit.SWTRIG0 = 1; break;
-    case 1:
-      dmac->SWTRIGCTRL.bit.SWTRIG1 = 1; break;
-    case 2:
-      dmac->SWTRIGCTRL.bit.SWTRIG2 = 1; break;
-    case 3:
-      dmac->SWTRIGCTRL.bit.SWTRIG3 = 1; break;
-    case 4:
-      dmac->SWTRIGCTRL.bit.SWTRIG4 = 1; break;
-    case 5:
-      dmac->SWTRIGCTRL.bit.SWTRIG5 = 1; break;
-    case 6:
-      dmac->SWTRIGCTRL.bit.SWTRIG6 = 1; break;
-    case 7:
-      dmac->SWTRIGCTRL.bit.SWTRIG7 = 1; break;
-    case 8:
-      dmac->SWTRIGCTRL.bit.SWTRIG8 = 1; break;
-    case 9:
-      dmac->SWTRIGCTRL.bit.SWTRIG9 = 1; break;
-    case 10:
-      dmac->SWTRIGCTRL.bit.SWTRIG10 = 1; break;
-    case 11:
-      dmac->SWTRIGCTRL.bit.SWTRIG11 = 1; break;
-    default:
-      break;
-  }
+  dmac->SWTRIGCTRL.reg = DMAC_SWTRIGCTRL_SWTRIG(channel);
 }
 
 void Dma::init() {
   Dmac* dmac = DMAC;
   /// configure power management
   PM->AHBMASK.bit.DMAC_ = 1;
+  PM->APBBMASK.bit.DMAC_ = 1;
   
+  /// configure clock
+  GCLK->CLKCTRL.reg =  GCLK_CLKCTRL_ID_DAC | // Generic Clock 21 (DAC)
+                       GCLK_CLKCTRL_GEN_GCLK0 | // Generic Clock Generator 0 is source
+                       GCLK_CLKCTRL_CLKEN ;
+  while ( GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY ) {}  // Wait for sync
+     
   /// configure NVIC
-  NVIC_EnableIRQ(DMAC_IRQn);
+  NVIC_DisableIRQ(DMAC_IRQn);
   NVIC_SetPriority(DMAC_IRQn, 1);
+  NVIC_EnableIRQ(DMAC_IRQn);
   
   /// Configure common DMAC stuff
   dmac->CTRL.bit.DMAENABLE = 0;
@@ -114,10 +102,15 @@ void Dma::init() {
   
   dmac->BASEADDR.reg = reinterpret_cast<uint32_t>(&(dma_first_desc[0]));  
   dmac->WRBADDR.reg = reinterpret_cast<uint32_t>(&(dma_working_desc[0]));
-  dmac->CTRL.bit.LVLEN0 = 1;
-  dmac->CTRL.bit.LVLEN1 = 1;
-  dmac->CTRL.bit.LVLEN2 = 1;
-  dmac->CTRL.bit.LVLEN3 = 1;
+  dmac->CTRL.reg = DMAC_CTRL_LVLEN0 |
+                   DMAC_CTRL_LVLEN1 |
+                   DMAC_CTRL_LVLEN3 |
+                   DMAC_CTRL_LVLEN2;
+  dmac->QOSCTRL.bit.DQOS = DMAC_QOSCTRL_DQOS_HIGH_Val;  // DATA QoS
+  dmac->QOSCTRL.bit.FQOS = DMAC_QOSCTRL_FQOS_HIGH_Val;  // Fetch QoS
+  dmac->QOSCTRL.bit.WRBQOS = DMAC_QOSCTRL_WRBQOS_HIGH_Val;  // Writeback WQoS
+  
+  dmac->PRICTRL0.reg = 0;  // static priority levels
   dmac->CTRL.bit.DMAENABLE = 1;
   while (1 != dmac->CTRL.bit.DMAENABLE) {}
 }
