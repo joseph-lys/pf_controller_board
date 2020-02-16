@@ -16,17 +16,7 @@ void SERCOM4_Handler (void) {
 }
 
 void SpiEnd_Handler (void) {
-  volatile int x;
-  auto rxw = Dma::workingDesc(0);
-  auto txw = Dma::workingDesc(1);
-  auto rxf = Dma::firstDesc(0);
-  auto txf = Dma::firstDesc(1);
-
   SPI.endTransactionInterrupt();
-  
-  delay(10);
-  x++;
-  
 }
 
 void setup() {
@@ -34,13 +24,15 @@ void setup() {
   Dma::init();
   /// Additional configuration for SERCOM 2 as UART
   SerialUSB.begin(1000000);
-  Serial1.begin(9600);
-  Serial.begin(9600);
-  //Serial RX: D3 (PA09), TX: D4 (PA08)
+  Serial1.begin(9600);  // Start Serial1 (Arduino UART) at 9600 Baud Rate
+  Serial.begin(9600);  // Start Serial (DMA UART) at 9600 Baud Rate
+  
+  // Serial (DMA UART) RX: D3 (PA09), TX: D4 (PA08), pinmux is set here as it is not correct in the variant.cpp file
   pinPeripheral(3, PIO_SERCOM_ALT);
   pinPeripheral(4, PIO_SERCOM_ALT);
+  
   // SPI 
-  // Duplicated SS signal to trigger an action when SPI transfer complete
+  // Duplicated SS signal to trigger an action when SPI transfer complete, SS is attached to LED_PIN in this case
   pinMode(LED_PIN, INPUT);
   attachInterrupt(LED_PIN, &SpiEnd_Handler, RISING);
   SPI.begin();
@@ -48,52 +40,40 @@ void setup() {
   delay(500);
 }
 
-uint8_t serial_test[] = "abcde";
-uint8_t dma_test[] = "dmatestload\n";
+uint8_t serial_test[] = "serial testload\n";
+uint8_t dma_test[] = "dma testload\n";
 void loop() {
   volatile int x;
-
-  while(1) {
-
-    delay(5000);
-    x++;
-    delay(1);
-    x++;
-    delay(1);
-    x++;
-  }
-  
-  delay(500);
-  SerialUSB.println("USBTESTLOAD");
-  delay(1);
-  while(Serial1.available()) {
-    x = Serial1.read();
-    if(x > 0) {
-      SerialUSB.write(static_cast<uint8_t>(x));
-      delay(1);
-    }
-  }
-  delay(3000);
+  SerialUSB.println("USB is alive");
   Serial1.write(serial_test, sizeof(serial_test));
   Serial.write(dma_test, sizeof(dma_test));
+  delay(1000);
   
-  while(Serial.available()) {
-    x = Serial.read();
-    if(x >= 0) {
-      SerialUSB.write(static_cast<uint8_t>(x));
-      SerialUSB.println(x);
-    } else {
-      x++;
+  if(Serial.available()) {
+    SerialUSB.println("\n\nSerial1 (Arduino UART) received:");
+    while(Serial.available()) {
+      x = Serial.read();
+      if(x >= 0) {
+        SerialUSB.write(static_cast<char>(x & 0xff));
+      }
     }
-  }
-  delay(200);
-  while(Serial.available()) {
-    x = Serial.read();
-    if(x >= 0) {
-      SerialUSB.write(static_cast<uint8_t>(x));
-      SerialUSB.println(x);
-    } else {
-      x++;
+  }  
+  
+  if (Serial1.available()) {
+    SerialUSB.println("\n\nSerial (DMA UART) received:");
+    while(Serial1.available()) {
+      x = Serial1.read();
+      if(x >= 0) {
+        SerialUSB.write(static_cast<char>(x & 0xff));
+      }
     }
-  }
+  }    
+  
+  uint8_t* pSpiRx = SPI.getRxDataPtr();
+  if (pSpiRx) {
+    SerialUSB.println("\n\SPI received:"); 
+    for (int i=0; i<SPI.buffer_size; i++) {
+      SerialUSB.write(pSpiRx[i]);
+    }
+  }  
 }

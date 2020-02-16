@@ -14,10 +14,10 @@
 #include "callback.h"
 
 // use DMA to continuously read data
-class DmaContinuousReader : public Callback {
+class DmaContinuousReader{
  public:
   explicit DmaContinuousReader(uint8_t _dma_channel, XSERCOM* _sercom);
-  void callback(int) override;
+  uint32_t callback(uint32_t, uint32_t);
   int readByte();
   uint32_t available();
   void start();
@@ -45,10 +45,10 @@ class DmaContinuousReader : public Callback {
 };
 
 // Use DMA to transmit a single transaction
-class DmaOneOffWriter : public Callback {
+class DmaOneOffWriter {
  public:
   explicit DmaOneOffWriter(uint8_t _dma_channel, XSERCOM* _sercom);
-  Callback* post_transfer_callback;
+  Callback post_transfer_callback;
   // begin a single write transaction
   void write(uint8_t* _tx_buf, uint32_t _tx_len);
   
@@ -58,7 +58,7 @@ class DmaOneOffWriter : public Callback {
   // check if transfer is busy
   bool isBusy();
   
-  void callback(int) override;
+  uint32_t callback(uint32_t, uint32_t);
   
  protected:
   DmaInstance dma_;

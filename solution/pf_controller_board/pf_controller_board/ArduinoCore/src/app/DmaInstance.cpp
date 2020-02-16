@@ -8,10 +8,10 @@
 #include "DmaCommon.h"
 #include "DmaInstance.h"
 
-DmaInstance::DmaInstance(uint8_t _dma_channel, Callback* callback_instance)
-: dma_channel(_dma_channel), ch_desc(Dma::firstDesc(_dma_channel)), _has_callback(callback_instance != nullptr) {
+DmaInstance::DmaInstance(uint8_t _dma_channel, Callback callback_function)
+: dma_channel(_dma_channel), ch_desc(Dma::firstDesc(_dma_channel)), _has_callback(callback_function.isValid()) {
   if (_has_callback) {
-    Dma::registerChannel(dma_channel, callback_instance);
+    Dma::registerChannel(dma_channel, callback_function);
   }
 }
 

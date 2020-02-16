@@ -11,7 +11,7 @@
 
 static DmacDescriptor dma_first_desc[DMA_MAX_CHANNELS_USED] __attribute__((__aligned__(16)));
 static DmacDescriptor dma_working_desc[DMA_MAX_CHANNELS_USED] __attribute__((__aligned__(16)));
-static Callback* channel_callbacks[DMA_MAX_CHANNELS_USED]{nullptr};
+static Callback channel_callbacks[DMA_MAX_CHANNELS_USED]{};
 
 DmacDescriptor* Dma::firstDesc(uint8_t channel) {
   return &(dma_first_desc[channel]);
@@ -45,8 +45,8 @@ void Dma::defaultDesc(DmacDescriptor& desc) {
   desc.DSTADDR.reg = 0;  
 }
 
-void Dma::registerChannel(uint8_t channel, Callback* ins) {
-  channel_callbacks[channel] = ins;
+void Dma::registerChannel(uint8_t channel, Callback callback) {
+  channel_callbacks[channel] = callback;
 }
 
 uint8_t Dma::getSercomTx(uint8_t sercom_id) {
@@ -67,8 +67,8 @@ void Dma::irqHandler() {
   dmac->CHINTFLAG.reg = int_flag;
   __enable_irq();
   dmac->INTPEND.bit.ID = 11;  // id can only go downwards, set to highest
-  if (channel_callbacks[id] != nullptr) {
-    channel_callbacks[id]->callback(int_flag);
+  if (channel_callbacks[id].isValid()) {
+    channel_callbacks[id](int_flag, 0);
   }    
 }
 

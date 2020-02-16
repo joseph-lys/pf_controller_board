@@ -41,12 +41,14 @@ static IRQn_Type getIRQnInternal(Sercom* sercom) {
   } else if(sercom == SERCOM5) {
     return SERCOM5_IRQn;
   } else {
-    assert(false && "Unknown IRQn");  
+    return PendSV_IRQn;  
   }
 }
 
 XSERCOM::XSERCOM(Sercom* s) 
-: SERCOM(s), sercom_id_(getSercomIdInternal(s)), irqn_(getIRQnInternal(s)),
+: SERCOM_(s), sercom_(s),
+sercom_id_(getSercomIdInternal(s)), 
+irqn_(getIRQnInternal(s)),
 dataAddressI2CM(reinterpret_cast<uint32_t>(&(s->I2CM.DATA.reg))),
 dataAddressI2CS(reinterpret_cast<uint32_t>(&(s->I2CS.DATA.reg))),
 dataAddressUSART(reinterpret_cast<uint32_t>(&(s->USART.DATA.reg))),
@@ -57,7 +59,7 @@ dataAddressSPI(reinterpret_cast<uint32_t>(&(s->SPI.DATA.reg)))
 
 
 Sercom* XSERCOM::getSercomPointer() {
-  return sercom;
+  return sercom_;
 }
 
 void XSERCOM::initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pad, SercomSpiCharSize charSize, SercomDataOrder dataOrder)
@@ -65,40 +67,34 @@ void XSERCOM::initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pa
   resetSPI();
   // initClockNVIC();
     uint8_t clockId = 0;
-  IRQn_Type IdNvic=PendSV_IRQn ; // Dummy init to intercept potential error later
+  IRQn_Type IdNvic= irqn_ ; // Dummy init to intercept potential error later
 
-  if(sercom == SERCOM0)
+  if(sercom_ == SERCOM0)
   {
     clockId = GCM_SERCOM0_CORE;
-    IdNvic = SERCOM0_IRQn;
   }
-  else if(sercom == SERCOM1)
+  else if(sercom_ == SERCOM1)
   {
     clockId = GCM_SERCOM1_CORE;
-    IdNvic = SERCOM1_IRQn;
   }
-  else if(sercom == SERCOM2)
+  else if(sercom_ == SERCOM2)
   {
     clockId = GCM_SERCOM2_CORE;
-    IdNvic = SERCOM2_IRQn;
   }
-  else if(sercom == SERCOM3)
+  else if(sercom_ == SERCOM3)
   {
     clockId = GCM_SERCOM3_CORE;
-    IdNvic = SERCOM3_IRQn;
   }
   #if defined(SERCOM4)
-  else if(sercom == SERCOM4)
+  else if(sercom_ == SERCOM4)
   {
     clockId = GCM_SERCOM4_CORE;
-    IdNvic = SERCOM4_IRQn;
   }
   #endif // SERCOM4
   #if defined(SERCOM5)
-  else if(sercom == SERCOM5)
+  else if(sercom_ == SERCOM5)
   {
     clockId = GCM_SERCOM5_CORE;
-    IdNvic = SERCOM5_IRQn;
   }
   #endif // SERCOM5
   if ( IdNvic == PendSV_IRQn )
@@ -122,79 +118,118 @@ void XSERCOM::initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pa
   while ( GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY ) {}  // Wait for sync
   
   //Setting the CTRLA register
-  sercom->SPI.CTRLA.reg =	SERCOM_SPI_CTRLA_MODE_SPI_SLAVE |
+  sercom_->SPI.CTRLA.reg =	SERCOM_SPI_CTRLA_MODE_SPI_SLAVE |
     SERCOM_SPI_CTRLA_DOPO(tx_pad) |
     SERCOM_SPI_CTRLA_DIPO(rx_pad) |
     (dataOrder << SERCOM_SPI_CTRLA_DORD_Pos);
 
   //Setting the CTRLB register
-  sercom->SPI.CTRLB.reg = SERCOM_SPI_CTRLB_CHSIZE(charSize) | 
+  sercom_->SPI.CTRLB.reg = SERCOM_SPI_CTRLB_CHSIZE(charSize) | 
     SERCOM_SPI_CTRLB_RXEN | // Active the SPI receiver.
     SERCOM_SPI_CTRLB_SSDE ;	// Enable Slave Select Low Interrupt
-  sercom->SPI.INTENCLR.reg = SERCOM_SPI_INTENCLR_MASK; // clear all interrupts
+  sercom_->SPI.INTENCLR.reg = SERCOM_SPI_INTENCLR_MASK; // clear all interrupts
   clearSpiInterruptFlags();
   enableSpiInterrruptSSL();
   NVIC_EnableIRQ(IdNvic);
 }
 
-void XSERCOM::initSPISlaveClock(SercomSpiClockMode clockMode)
-{
-//   //Extract data from clockMode
-//   int cpha, cpol;
-// 
-//   if((clockMode & (0x1ul)) == 0 )
-//     cpha = 0;
-//   else
-//     cpha = 1;
-// 
-//   if((clockMode & (0x2ul)) == 0)
-//     cpol = 0;
-//   else
-//     cpol = 1;
-// 
-//   //Setting the CTRLA register
-//   sercom->SPI.CTRLA.reg |=	( cpha << SERCOM_SPI_CTRLA_CPHA_Pos ) |
-//                             ( cpol << SERCOM_SPI_CTRLA_CPOL_Pos );
-//   
-//   //Synchronous arithmetic
-//   sercom->SPI.BAUD.reg = 0;
+void XSERCOM::initSPISlaveClock(SercomSpiClockMode clockMode) {
   uint32_t mode;
   switch(clockMode) {
     case SERCOM_SPI_MODE_0:
-      sercom->SPI.CTRLA.bit.CPOL = 0;
-      sercom->SPI.CTRLA.bit.CPHA = 0;
+      sercom_->SPI.CTRLA.bit.CPOL = 0;
+      sercom_->SPI.CTRLA.bit.CPHA = 0;
       break;
     case SERCOM_SPI_MODE_1:
-      sercom->SPI.CTRLA.bit.CPOL = 0;
-      sercom->SPI.CTRLA.bit.CPHA = 1;
+      sercom_->SPI.CTRLA.bit.CPOL = 0;
+      sercom_->SPI.CTRLA.bit.CPHA = 1;
       break;
     case SERCOM_SPI_MODE_2:
-      sercom->SPI.CTRLA.bit.CPOL = 1;
-      sercom->SPI.CTRLA.bit.CPHA = 0;
+      sercom_->SPI.CTRLA.bit.CPOL = 1;
+      sercom_->SPI.CTRLA.bit.CPHA = 0;
       break;
     case SERCOM_SPI_MODE_3:
-      sercom->SPI.CTRLA.bit.CPOL = 1;
-      sercom->SPI.CTRLA.bit.CPHA = 1;
+      sercom_->SPI.CTRLA.bit.CPOL = 1;
+      sercom_->SPI.CTRLA.bit.CPHA = 1;
       break;
     default:
       while (1) { } // problem
       break;
   }
-  sercom->SPI.BAUD.reg = 0;  //
+  sercom_->SPI.BAUD.reg = 0;  //
 }
 
 void XSERCOM::clearSpiInterruptFlags() {
-  sercom->SPI.INTFLAG.reg = sercom->SPI.INTFLAG.reg;
+  sercom_->SPI.INTFLAG.reg = sercom_->SPI.INTFLAG.reg;
 }
 
 void XSERCOM::disableSpiInterrruptSSL() {
-  sercom->SPI.INTENCLR.bit.SSL = 0;
+  sercom_->SPI.INTENCLR.bit.SSL = 0;
 }
 
 void XSERCOM::enableSpiInterrruptSSL() {
-  sercom->SPI.INTENSET.bit.SSL = 1;
+  sercom_->SPI.INTENSET.bit.SSL = 1;
 }
 
-void XSERCOM::writeNowaitSPI(uint32_t value) {
-  sercom->SPI.DATA.reg = SERCOM_SPI_DATA_DATA(value);
+// void XSERCOM::writeNowaitSPI(uint32_t value) {
+//   sercom_->SPI.DATA.reg = SERCOM_SPI_DATA_DATA(value);
+// }
+
+void XSERCOM::enableSPI() {
+  SERCOM_.enableSPI();
+}
+
+void XSERCOM::disableSPI() {
+  SERCOM_.disableSPI();
+}
+
+void XSERCOM::resetSPI() {
+  SERCOM_.resetSPI();
+}
+
+void XSERCOM::initUART(SercomUartMode mode, 
+                       SercomUartSampleRate sampleRate, 
+                       uint32_t baudrate) {
+  SERCOM_.initUART(mode, sampleRate, baudrate);
+}
+
+void XSERCOM::initFrame(SercomUartCharSize charSize, 
+                        SercomDataOrder dataOrder, 
+                        SercomParityMode parityMode, 
+                        SercomNumberStopBit nbStopBits) {
+  SERCOM_.initFrame(charSize, dataOrder, parityMode, nbStopBits);
+}
+
+void XSERCOM::initPads(SercomUartTXPad txPad, SercomRXPad rxPad) {
+  SERCOM_.initPads(txPad, rxPad);
+}
+
+void XSERCOM::enableUART() {
+  SERCOM_.enableUART();
+}
+
+void XSERCOM::disableIRQ() {
+  NVIC_DisableIRQ(irqn_);
+}
+
+void XSERCOM::enableIRQ() {
+  NVIC_EnableIRQ(irqn_);
+}
+
+void XSERCOM::setPriorityIRQ(uint32_t priority) {
+  NVIC_SetPriority(irqn_, priority);
+}
+
+void XSERCOM::disableUartInterrrupt() {
+  sercom_->USART.INTENCLR.reg = sercom_->USART.INTENSET.reg;
+  
+  // SERCOM2->USART.INTENCLR.bit.CTSIC = 1;
+  // SERCOM2->USART.INTENCLR.bit.DRE = 1;
+  // SERCOM2->USART.INTENCLR.bit.RXBRK = 1;
+  // SERCOM2->USART.INTENCLR.bit.RXC = 1;
+  // SERCOM2->USART.INTENCLR.bit.RXS = 1;
+}
+
+void XSERCOM::enableUARTInterrruptTXC() {
+  sercom_->USART.INTENSET.bit.TXC = 1;
 }
