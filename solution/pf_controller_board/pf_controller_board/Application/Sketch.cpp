@@ -27,12 +27,12 @@ void setup() {
   Serial1.begin(9600);  // Start Serial1 (Arduino UART) at 9600 Baud Rate
   Serial.begin(9600);  // Start Serial (DMA UART) at 9600 Baud Rate
   
-  // Serial (DMA UART) RX: D3 (PA09), TX: D4 (PA08), pinmux is set here as it is not correct in the variant.cpp file
+  // Serial (DMA UART) RX: D3 (PA09), TX: D4 (PA08), pinmux is configured here as it is not correct in the variant.cpp file
   pinPeripheral(3, PIO_SERCOM_ALT);
   pinPeripheral(4, PIO_SERCOM_ALT);
   
   // SPI 
-  // Duplicated SS signal to trigger an action when SPI transfer complete, SS is attached to LED_PIN in this case
+  // Duplicated SS signal to trigger an action when SPI transfer complete (LED_PIN in this case)
   pinMode(LED_PIN, INPUT);
   attachInterrupt(LED_PIN, &SpiEnd_Handler, RISING);
   SPI.begin();
@@ -44,13 +44,12 @@ uint8_t serial_test[] = "serial testload\n";
 uint8_t dma_test[] = "dma testload\n";
 void loop() {
   volatile int x;
-  SerialUSB.println("USB is alive");
   Serial1.write(serial_test, sizeof(serial_test));
   Serial.write(dma_test, sizeof(dma_test));
   delay(1000);
   
   if(Serial.available()) {
-    SerialUSB.println("\n\nSerial1 (Arduino UART) received:");
+    SerialUSB.println("\n\nSerial (DMA UART) received:");
     while(Serial.available()) {
       x = Serial.read();
       if(x >= 0) {
@@ -60,7 +59,7 @@ void loop() {
   }  
   
   if (Serial1.available()) {
-    SerialUSB.println("\n\nSerial (DMA UART) received:");
+    SerialUSB.println("\n\nSerial1 (Arduino UART) received:");
     while(Serial1.available()) {
       x = Serial1.read();
       if(x >= 0) {
