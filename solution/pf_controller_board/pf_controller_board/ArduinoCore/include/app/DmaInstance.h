@@ -12,9 +12,10 @@
 #include "Arduino.h"
 #include "dmac.h"
 #include "callback.h"
+
 class DmaInstance {
  public:
-  explicit DmaInstance(uint8_t channel, Callback* callback_instance);
+  explicit DmaInstance(uint8_t channel, Callback callback_function);
   virtual ~DmaInstance();
   const uint8_t dma_channel;
   DmacDescriptor* const ch_desc;

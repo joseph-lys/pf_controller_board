@@ -27,12 +27,14 @@ typedef enum
 	SPI_SLAVE_RX_PAD_3
 } SercomSpiRXSlavePad;
 
-class XSERCOM : public SERCOM {
-private:
+class XSERCOM {
+protected:
+  Sercom* sercom_;
   const uint8_t sercom_id_;
   const IRQn_Type irqn_;
 public:
   XSERCOM(Sercom* s);
+  SERCOM SERCOM_;  // default implementation of Arduino sercom library.
   
   inline uint8_t getSercomId() {
     return sercom_id_;
@@ -49,14 +51,30 @@ public:
   Sercom* getSercomPointer();
   void initSPISlave(SercomSpiTXSlavePad tx_pad, SercomSpiRXSlavePad rx_pad, SercomSpiCharSize charSize, SercomDataOrder dataOrder);
   void initSPISlaveClock(SercomSpiClockMode clockMode);
-  
   void clearSpiInterruptFlags();
-  
   void disableSpiInterrruptSSL();
-  
   void enableSpiInterrruptSSL();
+  // void writeNowaitSPI(uint32_t value);
   
-  void writeNowaitSPI(uint32_t value);
+  void enableSPI();
+  void disableSPI();
+  void resetSPI();
+  
+  void initUART(SercomUartMode mode,
+                SercomUartSampleRate sampleRate,
+                uint32_t baudrate=0);
+  void initFrame(SercomUartCharSize charSize,
+                 SercomDataOrder dataOrder,
+                 SercomParityMode parityMode,
+                 SercomNumberStopBit nbStopBits);
+  void initPads(SercomUartTXPad txPad, SercomRXPad rxPad);
+  void enableUART();
+  
+  void disableIRQ();
+  void enableIRQ();
+  void setPriorityIRQ(uint32_t priority);
+  void disableUartInterrrupt();
+  void enableUARTInterrruptTXC();
 };
 
 

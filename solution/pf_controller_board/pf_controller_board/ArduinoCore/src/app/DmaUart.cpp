@@ -14,13 +14,14 @@
 #include "DmaCommon.h"
 #include "limits.h"
 
+
 DmaContinuousReader::DmaContinuousReader(uint8_t _dma_channel, XSERCOM* _sercom)
-: dma_(_dma_channel, this), sercom(_sercom), 
+: dma_(_dma_channel, Callback{*this, &DmaContinuousReader::callback}), sercom(_sercom), 
 read_(0), write_(0), work_idx_(0), 
 dma_channel(_dma_channel){
 }
 
-void DmaContinuousReader::callback(int) {
+uint32_t DmaContinuousReader::callback(uint32_t, uint32_t) {
   volatile uint32_t read_block_idx;
   
   // push read counter out of current block
@@ -32,6 +33,7 @@ void DmaContinuousReader::callback(int) {
   }
   write_ += block_data_size;
   __enable_irq();
+  return 0;
 }
 
 int DmaContinuousReader::readByte() {
@@ -122,7 +124,10 @@ void DmaContinuousReader::setup(){
 
 
 DmaOneOffWriter::DmaOneOffWriter(uint8_t _dma_channel, XSERCOM* _sercom) 
-: dma_(_dma_channel, this), sercom(_sercom), dma_channel(_dma_channel), is_busy(false) {
+: dma_(_dma_channel, Callback{*this, &DmaOneOffWriter::callback}), 
+  sercom(_sercom), 
+  dma_channel(_dma_channel), 
+  is_busy(false) {
 }
 
 void DmaOneOffWriter::write(uint8_t* _tx_buf, uint32_t _tx_len) {
@@ -133,12 +138,11 @@ void DmaOneOffWriter::write(uint8_t* _tx_buf, uint32_t _tx_len) {
   is_busy = true;
 }
 
-void DmaOneOffWriter::callback(int status) {
+uint32_t DmaOneOffWriter::callback(uint32_t status, uint32_t extended_status) {
   is_busy = false;
   dma_.stop();
-  if (post_transfer_callback != nullptr) {
-    post_transfer_callback->callback(status);
-  }
+  post_transfer_callback(status, extended_status);
+  return 0;
 }
 
 bool DmaOneOffWriter::isBusy() {
@@ -169,17 +173,11 @@ void DmaUart::begin(unsigned long baudrate, uint16_t config) {
   sercom->initUART(UART_INT_CLOCK, SAMPLE_RATE_x16, baudrate);
   sercom->initFrame(extractCharSize(config), LSB_FIRST, extractParity(config), extractNbStopBit(config));
   sercom->initPads(uc_padTX, uc_padRX);
-  NVIC_DisableIRQ(sercom->getIRQn());
-  // clear some interrupts
-  SERCOM2->USART.INTENCLR.bit.CTSIC = 1;
-  SERCOM2->USART.INTENCLR.bit.DRE = 1;
-  SERCOM2->USART.INTENCLR.bit.RXBRK = 1;
-  SERCOM2->USART.INTENCLR.bit.RXC = 1;
-  SERCOM2->USART.INTENCLR.bit.RXS = 1;
-  // SERCOM2->USART.INTENCLR.bit.TXC = 1;
-  SERCOM2->USART.INTENSET.bit.TXC = 1;
-  NVIC_SetPriority(sercom->getIRQn(), 2);
-  NVIC_EnableIRQ(sercom->getIRQn());
+  sercom->disableIRQ();
+  sercom->disableUartInterrrupt();
+  // sercom->enableUARTInterrruptTXC();
+  sercom->setPriorityIRQ(2);
+  sercom->enableIRQ();
   sercom->enableUART();
   
   reader.start();

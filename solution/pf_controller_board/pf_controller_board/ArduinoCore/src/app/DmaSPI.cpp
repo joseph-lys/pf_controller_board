@@ -87,7 +87,7 @@ static SercomSpiRXSlavePad SPISlaveEquivalentRxPad(SercomSpiTXPad original_txpad
 
 DmaSPISlaveClass::DmaSPISlaveClass(XSERCOM *p_sercom,uint8_t dma_rx_channel, uint8_t dma_tx_channel, uint8_t uc_pinMISO, uint8_t uc_pinSCK, uint8_t uc_pinMOSI, uint8_t uc_pinSS, SercomSpiTXSlavePad PadTx, SercomSpiRXSlavePad PadRx) 
 : 
-dma_rx(dma_rx_channel, nullptr), dma_tx(dma_tx_channel, nullptr),
+dma_rx(dma_rx_channel, Callback{}), dma_tx(dma_tx_channel, Callback{}),
 _data_register(p_sercom->dataAddressSPI)
 {
   initialized = false;
