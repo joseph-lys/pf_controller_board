@@ -266,24 +266,6 @@
     </ToolchainSettings>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="include\app\dma_common.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="include\app\dma_instance.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="include\app\dma_spi.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="include\app\dma_uart.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="include\app\callback.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="include\app\dma_sercom.h">
-      <SubType>compile</SubType>
-    </Compile>
     <Compile Include="include\core\Arduino.h">
       <SubType>compile</SubType>
     </Compile>
@@ -683,22 +665,7 @@
     <Compile Include="include\variants\variant.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="src\app\dma_instance.cpp">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\app\dma_spi.cpp">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\app\dma_uart.cpp">
-      <SubType>compile</SubType>
-    </Compile>
     <Compile Include="src\app\safeboot.cpp">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\app\dma_common.cpp">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\app\dma_sercom.cpp">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\core\abi.cpp">
@@ -800,7 +767,6 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="include\" />
-    <Folder Include="include\app\" />
     <Folder Include="include\core\" />
     <Folder Include="include\core\avr\" />
     <Folder Include="include\core\samd21\" />
