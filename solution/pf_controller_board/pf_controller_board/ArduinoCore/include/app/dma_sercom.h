@@ -6,8 +6,8 @@
  */ 
 
 
-#ifndef XSERCOM_H_
-#define XSERCOM_H_
+#ifndef DMA_SERCOM_H_
+#define DMA_SERCOM_H_
 
 #include "SERCOM.h"
 

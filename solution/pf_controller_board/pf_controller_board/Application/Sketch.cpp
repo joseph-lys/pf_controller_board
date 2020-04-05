@@ -1,8 +1,8 @@
 ﻿/*Begining of Auto generated code by Atmel studio */
 #include <Arduino.h>
-#include "DmaCommon.h"
 #include "wiring_private.h"
-#include "DmaSPI.h"
+#include "dma_common.h"
+#include "dma_spi.h"
 /*End of auto generated code by Atmel studio */
 
 //Beginning of Auto generated function prototypes by Atmel Studio

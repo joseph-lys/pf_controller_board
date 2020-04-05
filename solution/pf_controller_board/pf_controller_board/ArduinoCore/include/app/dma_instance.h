@@ -17,8 +17,8 @@ class DmaInstance {
  public:
   explicit DmaInstance(uint8_t channel, Callback callback_function);
   virtual ~DmaInstance();
-  const uint8_t dma_channel;
-  DmacDescriptor* const ch_desc;
+  const uint8_t dma_channel_id_;
+  DmacDescriptor* const p_desc_;
   
   // Channel configuration for Sercom Tx
   void setupTxConfig(uint8_t sercom_id);
@@ -37,12 +37,12 @@ class DmaInstance {
     
   // First descriptor configuration for Sercom Tx
   inline void setupTxDescFirst(uint32_t tx_address, uint8_t* tx_buf, uint32_t len) {
-    setupTxDescAny(ch_desc, tx_address, tx_buf, len);
+    setupTxDescAny(p_desc_, tx_address, tx_buf, len);
   }
   
   // First descriptor configuration for Sercom Rx
   inline void setupRxDescFirst(uint32_t rx_address, uint8_t* rx_buf, uint32_t len) {
-    setupRxDescAny(ch_desc, rx_address, rx_buf, len);
+    setupRxDescAny(p_desc_, rx_address, rx_buf, len);
   }
   
   // Start dmac channel
@@ -78,11 +78,11 @@ class DmaInstance {
   
   // returns channel's pending flag
   inline bool isPending() {
-    return static_cast<bool>(DMAC->PENDCH.reg & (1u << dma_channel));
+    return static_cast<bool>(DMAC->PENDCH.reg & (1u << dma_channel_id_));
   }
   
   inline bool isBusy() {
-    return static_cast<bool>(DMAC->BUSYCH.reg & (1u << dma_channel));
+    return static_cast<bool>(DMAC->BUSYCH.reg & (1u << dma_channel_id_));
   }
   
   private:

@@ -40,9 +40,10 @@
 
 #ifdef __cplusplus
 #include "SERCOM.h"
-#include "XSERCOM.h"
 #include "Uart.h"
-#include "DmaUart.h"
+
+#include "dma_sercom.h"
+#include "dma_uart.h"
 #endif // __cplusplus
 
 #ifdef __cplusplus

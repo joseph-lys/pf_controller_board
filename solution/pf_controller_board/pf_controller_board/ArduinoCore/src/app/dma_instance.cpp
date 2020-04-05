@@ -5,13 +5,13 @@
  *  Author: Joseph
  */ 
 #include "Arduino.h"
-#include "DmaCommon.h"
-#include "DmaInstance.h"
+#include "dma_common.h"
+#include "dma_instance.h"
 
 DmaInstance::DmaInstance(uint8_t _dma_channel, Callback callback_function)
-: dma_channel(_dma_channel), ch_desc(Dma::firstDesc(_dma_channel)), _has_callback(callback_function.isValid()) {
+: dma_channel_id_(_dma_channel), p_desc_(Dma::firstDesc(_dma_channel)), _has_callback(callback_function.isValid()) {
   if (_has_callback) {
-    Dma::registerChannel(dma_channel, callback_function);
+    Dma::registerChannel(dma_channel_id_, callback_function);
   }
 }
 
@@ -35,7 +35,7 @@ void DmaInstance::setupTxConfig(uint8_t sercom_id, uint32_t priority) {
   ch_ctrl_b.bit.TRIGACT = DMAC_CHCTRLB_TRIGACT_BEAT_Val; 
   
   __disable_irq();
-  dmac->CHID.bit.ID = dma_channel;
+  dmac->CHID.bit.ID = dma_channel_id_;
   dmac->CHCTRLB.reg = ch_ctrl_b.reg;
   
 //   if (_has_callback) {
@@ -67,7 +67,7 @@ void DmaInstance::setupRxConfig(uint8_t sercom_id, uint32_t priority) {
   ch_ctrl_b.bit.TRIGACT = DMAC_CHCTRLB_TRIGACT_BEAT_Val;  
   
   __disable_irq();
-  dmac->CHID.bit.ID = dma_channel;
+  dmac->CHID.bit.ID = dma_channel_id_;
   dmac->CHCTRLB.reg = ch_ctrl_b.reg;
 
 //   if (_has_callback) {
@@ -152,7 +152,7 @@ void DmaInstance::start() {
   Dmac* dmac = DMAC;
   __disable_irq();
   // select DMA channel
-  dmac->CHID.bit.ID = dma_channel;
+  dmac->CHID.bit.ID = dma_channel_id_;
   // enable interrupts
   dmac->CHINTENSET.reg = DMAC_CHINTENSET_TERR | DMAC_CHINTENSET_TCMPL | DMAC_CHINTENSET_SUSP; //temp for testing
   dmac->CHINTFLAG.reg = dmac->CHINTFLAG.reg;
@@ -168,7 +168,7 @@ void DmaInstance::start() {
 void DmaInstance::stop() {
   Dmac* dmac = DMAC;
   __disable_irq();
-  dmac->CHID.bit.ID = dma_channel;
+  dmac->CHID.bit.ID = dma_channel_id_;
   // channel disable
   dmac->CHCTRLA.bit.ENABLE = 0;
   while(dmac->CHCTRLA.bit.ENABLE) {}  // wait for disable
@@ -179,37 +179,37 @@ void DmaInstance::stop() {
 }
 
 void DmaInstance::triggerBeat() {
-  Dma::swTrigger(dma_channel);
+  Dma::swTrigger(dma_channel_id_);
 }
 
 DmacDescriptor* DmaInstance::getDescFirst() {
-  return Dma::firstDesc(dma_channel);
+  return Dma::firstDesc(dma_channel_id_);
 }
 
 DmacDescriptor* DmaInstance::getDescWorking() {
-  return Dma::workingDesc(dma_channel);
+  return Dma::workingDesc(dma_channel_id_);
 }
 
 uint32_t DmaInstance::getWorkingCount() {
-  return Dma::workingDesc(dma_channel)->BTCNT.reg;
+  return Dma::workingDesc(dma_channel_id_)->BTCNT.reg;
 }
 
 uint32_t DmaInstance::getWorkingDestAddress() {
-  return Dma::workingDesc(dma_channel)->DSTADDR.reg;
+  return Dma::workingDesc(dma_channel_id_)->DSTADDR.reg;
 }
 
 uint32_t DmaInstance::getWorkingSrcAddress() {
-  return Dma::workingDesc(dma_channel)->SRCADDR.reg;
+  return Dma::workingDesc(dma_channel_id_)->SRCADDR.reg;
 }
 
 uint32_t DmaInstance::getWorkingNextDesc() {
-  return Dma::workingDesc(dma_channel)->DESCADDR.reg;
+  return Dma::workingDesc(dma_channel_id_)->DESCADDR.reg;
 }
 
 void DmaInstance::suspendChannel() {
   Dmac* dmac = DMAC;
   __disable_irq();
-  dmac->CHID.bit.ID = dma_channel;
+  dmac->CHID.bit.ID = dma_channel_id_;
   // channel suspend
   dmac->CHCTRLB.bit.CMD = DMAC_CHCTRLB_CMD_SUSPEND;
   __enable_irq();
@@ -218,7 +218,7 @@ void DmaInstance::suspendChannel() {
 void DmaInstance::resumeChannel() {
   Dmac* dmac = DMAC;
   __disable_irq();
-  dmac->CHID.bit.ID = dma_channel;
+  dmac->CHID.bit.ID = dma_channel_id_;
   // channel suspend
   dmac->CHCTRLB.bit.CMD = DMAC_CHCTRLB_CMD_RESUME;
   __enable_irq();

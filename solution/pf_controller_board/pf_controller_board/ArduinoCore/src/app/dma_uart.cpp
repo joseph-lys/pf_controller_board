@@ -7,11 +7,10 @@
 
 #include "Arduino.h"
 #include "dmac.h"
-#include "DmaUart.h"
-#include "SERCOM.h"
+#include "dma_common.h"
+#include "dma_uart.h"
 #include "HardwareSerial.h"
 #include "wiring_private.h"
-#include "DmaCommon.h"
 #include "limits.h"
 
 
@@ -115,11 +114,11 @@ void DmaContinuousReader::setup(){
     dma_.setupRxDescAny(&(descriptors[i]), rx_source_address, const_cast<uint8_t*>(&buffer_[(i + 1) * block_data_size]), block_data_size);
   }
   // link all descriptors
-  dma_.ch_desc->DESCADDR.reg = reinterpret_cast<uint32_t>(&(descriptors[0]));
+  dma_.p_desc_->DESCADDR.reg = reinterpret_cast<uint32_t>(&(descriptors[0]));
   for(int i=0; i<num_blocks - 2; i++) {
     descriptors[i].DESCADDR.reg = reinterpret_cast<uint32_t>(&(descriptors[i + 1]));
   }
-  descriptors[num_blocks - 2].DESCADDR.reg = reinterpret_cast<uint32_t>(dma_.ch_desc);
+  descriptors[num_blocks - 2].DESCADDR.reg = reinterpret_cast<uint32_t>(dma_.p_desc_);
 }
 
 

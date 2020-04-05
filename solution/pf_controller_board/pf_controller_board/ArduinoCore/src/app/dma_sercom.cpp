@@ -5,7 +5,7 @@
  *  Author: Joseph
  */ 
 
-#include "XSERCOM.h"
+#include "dma_sercom.h"
 #include "variant.h"
 #include "assert.h"
 

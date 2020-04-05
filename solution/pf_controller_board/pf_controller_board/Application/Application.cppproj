@@ -296,9 +296,11 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="external_libraries\samd_dma" />
     <Folder Include="linker_scripts\" />
     <Folder Include="linker_scripts\linker_scripts\" />
     <Folder Include="linker_scripts\linker_scripts\gcc\" />
+    <Folder Include="external_libraries" />
   </ItemGroup>
   <ItemGroup>
     <None Include="linker_scripts\linker_scripts\gcc\flash_without_bootloader.ld">

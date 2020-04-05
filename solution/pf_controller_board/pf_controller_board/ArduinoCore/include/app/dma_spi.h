@@ -21,7 +21,7 @@
 #define _SPI_H_INCLUDED
 
 #include <Arduino.h>
-#include <DmaInstance.h>
+#include "dma_instance.h"
 
 // DMA SPI buffer size, must be a power of 2
 #define DMA_SPI_BUFFER_SIZE 128
@@ -63,15 +63,15 @@ class DmaSPISlaveClass {
   };
   void begin();
   private:
-  const uint32_t _data_register;
-  bool initialized;
-  volatile bool _tx_pending;
-  volatile bool _rx_pending;
-  volatile uint8_t* volatile _tw_buffer;
-  volatile uint8_t* volatile _tx_buffer;
-  uint8_t volatile _w_buffer[DmaSPISlaveClass::buffer_size];
-  volatile uint8_t* volatile _rx_buffer;
-  volatile uint8_t* volatile _rw_buffer;
+  const uint32_t data_register_;
+  bool initialized_;
+  volatile bool tx_pending_;
+  volatile bool rx_pending_;
+  volatile uint8_t* volatile p_tw_buffer_;
+  volatile uint8_t* volatile p_tx_buffer_;
+  uint8_t volatile w_buffer_[DmaSPISlaveClass::buffer_size];
+  volatile uint8_t* volatile p_rx_buffer_;
+  volatile uint8_t* volatile p_rw_buffer_;
   
   uint32_t _prev_rem;
   
@@ -79,17 +79,17 @@ class DmaSPISlaveClass {
   void config();
   void end();
   
-  XSERCOM *_p_sercom;
-  uint8_t _uc_pinMiso;
-  uint8_t _uc_pinMosi;
-  uint8_t _uc_pinSCK;
-  uint8_t _uc_pinSS;
+  XSERCOM *p_sercom_;
+  uint8_t pin_miso_;
+  uint8_t pin_mosi_;
+  uint8_t pin_sck_;
+  uint8_t pin_ss_;
 
-  SercomSpiTXSlavePad _padTx;
-  SercomSpiRXSlavePad _padRx;
+  SercomSpiTXSlavePad pad_tx_;
+  SercomSpiRXSlavePad pad_rx_;
 
-  DmaInstance dma_rx;
-  DmaInstance dma_tx;
+  DmaInstance dma_rx_;
+  DmaInstance dma_tx_;
     
   public:
   // Call when CS changed

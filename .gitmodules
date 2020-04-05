@@ -1,0 +1,9 @@
+[submodule "solution/pf_controller_board/pf_controller_board/Application/external_libraries/DmaSamd"]
+	path = solution/pf_controller_board/pf_controller_board/Application/external_libraries/DmaSamd
+	url = https://github.com/joseph-lys/DmaSamd.git
+[submodule "solution/pf_controller_board/pf_controller_board/Application/external_libraries/dxl_driver"]
+	path = solution/pf_controller_board/pf_controller_board/Application/external_libraries/dxl_driver
+	url = https://github.com/joseph-lys/dxl_driver.git
+[submodule "solution/pf_controller_board/pf_controller_board/Application/external_libraries/dxl_driver_core"]
+	path = solution/pf_controller_board/pf_controller_board/Application/external_libraries/dxl_driver_core
+	url = https://github.com/joseph-lys/dxl_driver_core.git

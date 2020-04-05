@@ -9,8 +9,8 @@
 #ifndef DMAUARTMASTER_H_
 #define DMAUARTMASTER_H_
 
-#include "XSERCOM.h"
-#include "DmaInstance.h"
+#include "dma_sercom.h"
+#include "dma_instance.h"
 #include "callback.h"
 
 // use DMA to continuously read data

@@ -4,7 +4,7 @@
  * Created: 3/11/2019 10:12:42 PM
  *  Author: Joseph
  */
-#include "DmaCommon.h"
+#include "dma_common.h"
 #include "dmac.h"
 
 #define DMA_MAX_CHANNELS_USED 12
