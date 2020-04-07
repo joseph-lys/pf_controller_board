@@ -292,6 +292,18 @@
     <Compile Include="app\src\configuration.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="app\src\motor_driver.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="app\src\motor_driver.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="app\src\imp_hw_dxl.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="app\src\imp_hw_dxl.cpp">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="external_libraries\DmaSamd\src\callback.h">
       <SubType>compile</SubType>
     </Compile>
