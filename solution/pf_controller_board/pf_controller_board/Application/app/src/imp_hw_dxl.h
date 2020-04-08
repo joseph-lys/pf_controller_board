@@ -10,9 +10,10 @@
 #define IMP_HW_DXL_H_
 
 #include "dma_uart.h"
+#include "IfHwDxlDriverBase.h"
 
 /// Implementation of IfHwDxlDriverBase
-class ImpHwDxl : IfHwDxlDriverBase {
+class ImpHwDxl : public IfHwDxlDriverBase {
  private:
   const uint8_t dir_pin_;
   const uint8_t dir_tx_value_;
@@ -21,7 +22,7 @@ class ImpHwDxl : IfHwDxlDriverBase {
  public:
   ImpHwDxl() = delete;
 
-  ImpHwDxl(DmaUart& dma_uart, uint8_t dir_pin, uint32_t dir_tx_value;  
+  ImpHwDxl(DmaUart& dma_uart, uint8_t dir_pin, uint32_t dir_tx_value);  
   /// check if there are any available data on the receive buffer
   
   uint32_t setTxDirection(uint32_t, uint32_t);

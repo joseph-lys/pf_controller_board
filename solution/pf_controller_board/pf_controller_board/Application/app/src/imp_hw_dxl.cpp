@@ -14,7 +14,7 @@ ImpHwDxl::ImpHwDxl(DmaUart& dma_uart, uint8_t dir_pin, uint32_t dir_tx_value)
 dir_pin_(dir_pin),
 dir_tx_value_(static_cast<uint8_t>(dir_tx_value)),
 dir_rx_value_(static_cast<uint8_t>(dir_rx_value_ == HIGH ? LOW : HIGH)) {
-  p_hw_driver_->setTxDoneCallback(Callback(&this, &setTxDirection))
+  p_hw_driver_->setTxDoneCallback(Callback(*this, &ImpHwDxl::setTxDirection));
   setRxDirection(0, 0);
 }
 
