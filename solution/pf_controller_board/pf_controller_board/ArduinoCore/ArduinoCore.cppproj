@@ -266,24 +266,6 @@
     </ToolchainSettings>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="include\app\DmaCommon.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="include\app\DmaInstance.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="include\app\DmaSPI.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="include\app\DmaUart.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="include\app\callback.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="include\app\XSERCOM.h">
-      <SubType>compile</SubType>
-    </Compile>
     <Compile Include="include\core\Arduino.h">
       <SubType>compile</SubType>
     </Compile>
@@ -683,22 +665,7 @@
     <Compile Include="include\variants\variant.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="src\app\DmaInstance.cpp">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\app\DmaSPI.cpp">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\app\DmaUart.cpp">
-      <SubType>compile</SubType>
-    </Compile>
     <Compile Include="src\app\safeboot.cpp">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\app\DmaCommon.cpp">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\app\XSERCOM.cpp">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\core\abi.cpp">
@@ -800,7 +767,6 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="include\" />
-    <Folder Include="include\app\" />
     <Folder Include="include\core\" />
     <Folder Include="include\core\avr\" />
     <Folder Include="include\core\samd21\" />
