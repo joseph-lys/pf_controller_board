@@ -13,16 +13,16 @@
 #define LED_PIN 13
 
 void SERCOM4_Handler (void) {
-  DSPI.startTransactionInterrupt();
+  DSPI.doBeforeSpiStarts();
 }
 
 void SpiEnd_Handler (void) {
-  DSPI.endTransactionInterrupt();
+  DSPI.doAfterSpiStops();
 }
 
 void setup() {
   // put your setup code here, to run once:
-  Dma::init();
+  dma_common::init();
   /// Additional configuration for SERCOM 2 as UART
   SerialUSB.begin(1000000);
   Serial1.begin(9600);  // Start Serial1 (Arduino UART) at 9600 Baud Rate

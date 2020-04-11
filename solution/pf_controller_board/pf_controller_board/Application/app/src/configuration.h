@@ -1,9 +1,12 @@
-/*
- * configuration.h
- *
- * Created: 5/4/2020 11:51:47 AM
- *  Author: josep
- */ 
+/// configuration.h
+///
+/// Copyright (c) 2020 Joseph Lee Yuan Sheng
+///
+/// This file is part of pf_controller_board which is released under MIT license.
+/// See LICENSE file or go to https://github.com/joseph-lys/pf_controller_board for full license details.
+///
+/// Application assets
+///
 
 
 #ifndef CONFIGURATION_H_

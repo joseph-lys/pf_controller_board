@@ -1,10 +1,13 @@
-/*
- * dxl_driver.h
- *
- * Created: 6/4/2020 7:52:12 PM
- *  Author: josep
- */ 
-
+/// motor_driver.h
+///
+/// Copyright (c) 2020 Joseph Lee Yuan Sheng
+///
+/// This file is part of pf_controller_board which is released under MIT license.
+/// See LICENSE file or go to https://github.com/joseph-lys/pf_controller_board for full license details.
+///
+/// MotorDriver for this application.
+/// provide specific handles to read and write data on the motors
+///
 
 #ifndef MOTOR_DRIVER_H_
 #define MOTOR_DRIVER_H_
@@ -12,16 +15,18 @@
 
 #include "DxlDriver.h"
 
+/// Struct to store feedback data
 struct MotorFeedbackData {  // make this data fixed, simpler
   uint8_t status = 0xff;
   uint16_t position = 0xffff;
   uint16_t speed = 0xffff;
   uint16_t torque = 0xffff;
-  operator bool() const {
+  bool isValid() const {
     return (status != 0xff || position != 0xffff || speed != 0xffff || torque != 0xffff);
   }
 };
 
+/// handles for different purposes
 namespace motor_handles {
 
 class SyncWriteHandle;
@@ -31,11 +36,38 @@ class FeedbackHandle;
 }  // namespace motor_handles
 
 
-class MotorDriver {
+/// Factory class for generating handles for communicating with the motors
+class MotorHandleFactory {
+ public:
+  MotorHandleFactory();
+  ~MotorHandleFactory();
+  
+  /// Add a DxlDriver
+  /// @param driver instance of DxlDriver
+  void addDriver(DxlDriver& driver);
+
+  /// Run Initialization sequence
+  /// This will search for motors on each driver and and it to memory
+  void init();
+
+  /// Ping a motor
+  /// @param motor_id id of motor to ping
+  bool pingMotor(uint8_t motor_id);
+
+  /// Creates a handle for SyncWrite
+  motor_handles::SyncWriteHandle createSyncWriteHandle();
+
+  /// Create a handle to write specific values to a motor
+  /// @param id motor's id number, use 0xff to broadcast
+  motor_handles::GenericHandle createWriteHandle(uint8_t id);
+
+  /// Create a handle to get feedback from all motors
+  motor_handles::FeedbackHandle createFeedbackHandle();
+
+private:
   friend motor_handles::SyncWriteHandle;
   friend motor_handles::GenericHandle;
   friend motor_handles::FeedbackHandle;
- private:
   enum Constants: uint8_t {
     kMaxMotors = 32,
     kMaxDrivers = 4,
@@ -43,34 +75,17 @@ class MotorDriver {
   };
   bool driver_lock_ = false;
   uint8_t n_drivers_ = 0;
-  uint8_t motor_mapping[kMaxMotors]{kNoDriver};
-  DxlDriver* drivers_[kMaxDrivers]{nullptr};
-  MotorFeedbackData feedback_[kMaxMotors] = {}; 
+  uint8_t* p_id_mappings_ = nullptr;
+  DxlDriver** p_drivers_ = nullptr;
+  MotorFeedbackData* p_feedbacks_ = nullptr; 
   inline uint8_t getDriverIndex(uint8_t id) { 
-    return (id < kMaxMotors) ? motor_mapping[id] : 0xff; 
+    return (id < kMaxMotors) ? p_id_mappings_[id] : 0xff; 
   }
 
   inline DxlDriver* getDxlDriver(uint8_t id) { 
     uint8_t idx = getDriverIndex(id);
-    return (idx < n_drivers_) ? drivers_[idx] : nullptr;
+    return (idx < n_drivers_) ? p_drivers_[idx] : nullptr;
   }
-
- public:  
-  inline void addDriver(DxlDriver& driver) { 
-    if (n_drivers_ < kMaxDrivers) {
-      drivers_[n_drivers_++] = &driver;
-    }
-  }
-
-  void init();
-
-  bool pingMotor(uint8_t motor_id);
-
-  motor_handles::SyncWriteHandle createBroadcastHandle();
-
-  motor_handles::GenericHandle createWriteHandle(uint8_t id);  
-
-  motor_handles::FeedbackHandle createFeedbackHandle();
 };
 
 
@@ -79,31 +94,31 @@ namespace motor_handles {
 
 
 class SyncWriteHandle {
-  bool initialized_[MotorDriver::kMaxDrivers];
-  uint8_t state_ = 0;
-  DxlDriver* p_current_dxl_ = nullptr;
-  MotorDriver* p_motors_ = nullptr;
  public:
   SyncWriteHandle() = default;
-  SyncWriteHandle(MotorDriver* p_motor_driver);
+  SyncWriteHandle(MotorHandleFactory* p_motor_driver);
   ~SyncWriteHandle();
+
   bool toMotor(uint8_t id);
   bool writeByte(uint8_t value);
   bool writeWord(uint16_t value);
   bool startTransmission();
   bool poll();
   bool close();
+
+ private:
+  bool initialized_[MotorHandleFactory::kMaxDrivers];
+  uint8_t state_ = 0;
+  DxlDriver* p_current_dxl_ = nullptr;
+  MotorHandleFactory* p_motors_ = nullptr;
 };
 
 class GenericHandle {
-  uint8_t state_ = 0;
-  uint8_t id_ = 0xff;
-  DxlDriver* p_current_dxl_ = nullptr;
-  MotorDriver* p_motors_ = nullptr;
  public:
   GenericHandle() = default;
-  GenericHandle(MotorDriver* p_motor_driver, uint8_t id);
+  GenericHandle(MotorHandleFactory* p_motor_driver, uint8_t id);
   ~GenericHandle();
+
   bool setInstruction(uint8_t ins);
   bool writeByte(uint8_t value);
   bool writeWord(uint16_t value);
@@ -114,19 +129,18 @@ class GenericHandle {
   uint8_t readByte();
   uint8_t readWord();
   bool close();
+
+ private:
+  uint8_t state_ = 0;
+  uint8_t id_ = 0xff;
+  DxlDriver* p_current_dxl_ = nullptr;
+  MotorHandleFactory* p_motors_ = nullptr;
 };
 
 class FeedbackHandle {
-  uint8_t combined_state_ = 0;
-  uint8_t states_[MotorDriver::kMaxDrivers] = {0};
-  MotorDriver* p_motors_ = nullptr;
-  enum Constants : uint8_t {
-    kFirstReg = 36,
-    kByteSize = 6
-  };
   public:
   FeedbackHandle() = default;
-  FeedbackHandle(MotorDriver* p_motor_driver);
+  FeedbackHandle(MotorHandleFactory* p_motor_driver);
   ~FeedbackHandle();
 
   /// Start reading all the motors. 
@@ -138,6 +152,16 @@ class FeedbackHandle {
   
   /// Closes the driver,
   bool close();
+
+ private:
+  uint8_t combined_state_ = 0;
+  uint8_t states_[MotorHandleFactory::kMaxDrivers] = {0};
+  MotorHandleFactory* p_motors_ = nullptr;
+  enum Constants : uint8_t {
+    kFirstReg = 36,
+    kByteSize = 6
+  };
+
 };
 
 }  // namespace motor_handles

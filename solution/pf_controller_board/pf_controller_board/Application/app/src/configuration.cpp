@@ -1,25 +1,28 @@
-/*
- * configuration.cpp
- *
- * Created: 5/4/2020 11:52:02 AM
- *  Author: josep
- */ 
+/// configuration.cpp
+///
+/// Copyright (c) 2020 Joseph Lee Yuan Sheng
+///
+/// This file is part of pf_controller_board which is released under MIT license.
+/// See LICENSE file or go to https://github.com/joseph-lys/pf_controller_board for full license details.
+///
+/// Application assets
+///
 
 #include "configuration.h"
-#include "dma_sercom.h"
+#include "extended_sercom.h"
 
 
 
-static DmaSercom dma_sercom_uart{ SERCOM2 };
+static ExtendedSercom xsercom_uart{ SERCOM2 };
 DmaUart DSerial{ 
-  &dma_sercom_uart,
+  &xsercom_uart,
   4, 5,  // RX: Dma Channel 4, TX: Dma Channel 5
   3, 4,  // RX: D3 (PA09), TX: D4 (PA08)
   SERCOM_RX_PAD_1, UART_TX_PAD_0  // PAD Settings
 };
 
 
-static DmaSercom SercomSPI{SERCOM4};
+static ExtendedSercom SercomSPI{SERCOM4};
 DmaSpiSlave DSPI {
   &SercomSPI, 
   0, 1,  // RX: Dma Channel 0, TX: Dma Channel 1
