@@ -19,5 +19,7 @@
 extern DmaUart DSerial;
 extern DmaSpiSlave DSPI;
 
+// Application specific initialization
+void initAppComponents();
 
 #endif /* CONFIGURATION_H_ */

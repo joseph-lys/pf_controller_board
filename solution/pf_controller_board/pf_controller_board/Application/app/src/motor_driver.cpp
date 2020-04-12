@@ -75,11 +75,11 @@ bool MotorHandleFactory::pingMotor(uint8_t id) {
   return is_found;
 }
 
-motor_handles::SyncWriteHandle MotorHandleFactory::createSyncWriteHandle() {
+motor_handles::SyncWriteHandle MotorHandleFactory::createSyncWriteHandle(uint8_t target_register, uint8_t number_of_bytes) {
   motor_handles::SyncWriteHandle handle;
   if (!driver_lock_) {
     driver_lock_ = true;
-    handle = motor_handles::SyncWriteHandle(this);
+    handle = motor_handles::SyncWriteHandle{this, target_register, number_of_bytes};
   }
   return handle;
 }
@@ -88,17 +88,19 @@ motor_handles::GenericHandle MotorHandleFactory::createWriteHandle(uint8_t id) {
   motor_handles::GenericHandle handle;
   if (!driver_lock_) {
     driver_lock_ = true;
-    handle = motor_handles::GenericHandle(this, id);
+    handle = motor_handles::GenericHandle{this, id};
     handle.setInstruction(DxlProtocolV1::Ins::kWrite);  // specialize to a write type
+  } else {
+    handle = motor_handles::GenericHandle{};
   }
   return handle;
-}
+}  
 
 motor_handles::FeedbackHandle MotorHandleFactory::createFeedbackHandle() {
   motor_handles::FeedbackHandle handle;
   if (!driver_lock_) {
     driver_lock_ = true;
-    handle = motor_handles::FeedbackHandle();
+    handle = motor_handles::FeedbackHandle{this};
   }
   return handle;
 }
@@ -118,8 +120,8 @@ enum TransactionState : uint8_t {
 //////////////////////////////////////////////////////////////////////////
 /// SyncWriteHandle
 //////////////////////////////////////////////////////////////////////////
-SyncWriteHandle::SyncWriteHandle(MotorHandleFactory* p_motor_driver) 
-: state_(kInitial), p_motors_(p_motor_driver) { }
+SyncWriteHandle::SyncWriteHandle(MotorHandleFactory* p_motor_driver, uint8_t target_register, uint8_t n_bytes) 
+: state_(kInitial), target_register_(target_register), n_bytes_(n_bytes), p_motors_(p_motor_driver) { }
 
 SyncWriteHandle::~SyncWriteHandle() {
   close();
@@ -127,20 +129,31 @@ SyncWriteHandle::~SyncWriteHandle() {
 
 bool SyncWriteHandle::toMotor(uint8_t id) {
   bool success = false;
-  uint8_t driver_idx = p_motors_->getDriverIndex(id);
+  uint8_t driver_idx = 0xff;
   if (state_ != kInitial) {
     // out of sequence call
-  } else if (id == DxlProtocolV1::kBroadcastId) {
+  } else if (p_motors_ != nullptr) {
+    driver_idx = p_motors_->getDriverIndex(id);
+  }
+  
+  if (id >= MotorHandleFactory::kMaxMotors ) {
     // not a valid id!
+  } else if (written_ != 0 && written_ != n_bytes_) {
+    // incorrectly written length! 
   } else if (driver_idx < p_motors_->n_drivers_) {
     p_current_dxl_ = p_motors_->p_drivers_[driver_idx];
     if (!initialized_[driver_idx]) {
       // not yet initialize this particular driver;
       p_current_dxl_->setTxIns(DxlProtocolV1::Ins::kBroadcastId, DxlProtocolV1::Ins::kSyncWrite);
+      p_current_dxl_->writeTxByte(target_register_);
+      p_current_dxl_->writeTxByte(n_bytes_);
       initialized_[driver_idx] = true;    
     }
     success = p_current_dxl_->writeTxByte(id);
-    state_ = kInTransit;
+    written_ = 0;
+  }
+  if (!success) {
+    close();
   }
   return success;
 }
@@ -149,8 +162,13 @@ bool SyncWriteHandle::writeByte(uint8_t value) {
   bool success = false;
   if (state_ != kInitial) {
     // out of sequence call, return default value false
-  } else if (p_current_dxl_ != nullptr) {
+  } else if (p_current_dxl_ == nullptr) {
+    // invalid
+  } else if (written_ < n_bytes_) {
     success = p_current_dxl_->writeTxByte(value);
+  }
+  if (!success) {
+    close();
   }
   return success;
 }
@@ -158,9 +176,14 @@ bool SyncWriteHandle::writeByte(uint8_t value) {
 bool SyncWriteHandle::writeWord(uint16_t value) {
   bool success = false;
   if (state_ != kInitial) {
-    // out of sequence call, return default value false
-  } else if (p_current_dxl_ != nullptr) {
+  // out of sequence call, return default value false
+  } else if (p_current_dxl_ == nullptr) {
+  // invalid
+  } else if (written_ < n_bytes_ && (written_ + 1) < n_bytes_) {
     success = p_current_dxl_->writeTxWord(value);
+  }
+  if (!success) {
+    close();
   }
   return success;
 }
@@ -171,7 +194,9 @@ bool SyncWriteHandle::startTransmission() {
   if (state_ != kInitial) {
     // out of sequence call, return default value false
   } else if (p_current_dxl_ == nullptr) {
-    // out of sequence call, no motor was every used
+    // invalid
+  }else if (written_ != n_bytes_) {
+    // something incomplete
   } else {
     p_current_dxl_ = nullptr;
     for (i=(uint8_t)0; i<p_motors_->n_drivers_; i++) {
@@ -182,6 +207,8 @@ bool SyncWriteHandle::startTransmission() {
   }
   if (started) {
     state_ = kInTransit;
+  } else {
+    close();
   }
   return started;
 }
@@ -262,6 +289,9 @@ bool GenericHandle::setInstruction(uint8_t ins) {
       state_ = kInitial;
     }
   }
+  if (!initialized) {
+    close();
+  }
   return initialized;
 }
 
@@ -274,6 +304,9 @@ bool GenericHandle::writeByte(uint8_t value) {
   } else if (p_current_dxl_ != nullptr) {
     success = p_current_dxl_->writeTxByte(value);
   }
+  if (!success) {
+    close();
+  }
   return success;
 }
 
@@ -285,6 +318,9 @@ bool GenericHandle::writeWord(uint16_t value) {
     // out of sequence call, return default value false
     } else if (p_current_dxl_ != nullptr) {
     success = p_current_dxl_->writeTxWord(value);
+  }
+  if (!success) {
+    close();
   }
   return success;  
 }
@@ -309,6 +345,8 @@ bool GenericHandle::startTransmission() {
 
   if (started) {
     state_ = kInTransit;
+  } else {
+    close();
   }
   return started;
 }

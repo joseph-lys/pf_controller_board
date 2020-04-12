@@ -7,9 +7,10 @@
 
 #include "Arduino.h"
 
+constexpr int sys_pb0_pin = 6ul;
+
 int safeboot( void ) {
     // SAFE BOOT INCASE I MESS UP! MUST BE BEFORE ALL INIT ACTIONS!
-    const int sys_pb0_pin = 8;
     volatile int count=0;
     pinMode(sys_pb0_pin, INPUT_PULLDOWN);
     while(count < 50) {

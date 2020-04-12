@@ -55,10 +55,10 @@ class MotorHandleFactory {
   bool pingMotor(uint8_t motor_id);
 
   /// Creates a handle for SyncWrite
-  motor_handles::SyncWriteHandle createSyncWriteHandle();
+  motor_handles::SyncWriteHandle createSyncWriteHandle(uint8_t target_register, uint8_t number_of_bytes);
 
   /// Create a handle to write specific values to a motor
-  /// @param id motor's id number, use 0xff to broadcast
+  /// @param id motor's id number, use DxlProcotolV1::kBroadcastId to broadcast
   motor_handles::GenericHandle createWriteHandle(uint8_t id);
 
   /// Create a handle to get feedback from all motors
@@ -96,8 +96,12 @@ namespace motor_handles {
 class SyncWriteHandle {
  public:
   SyncWriteHandle() = default;
-  SyncWriteHandle(MotorHandleFactory* p_motor_driver);
+  SyncWriteHandle(MotorHandleFactory* p_motor_driver, uint8_t target_register, uint8_t n_bytes);
   ~SyncWriteHandle();
+  SyncWriteHandle(SyncWriteHandle&) = delete;  // no copy constructor
+  SyncWriteHandle& operator=(SyncWriteHandle&) = delete;  // no copy assignment
+  SyncWriteHandle(SyncWriteHandle&&) = default; // default move constructor
+  SyncWriteHandle& operator=(SyncWriteHandle&&) = default;  // default move assignment
 
   bool toMotor(uint8_t id);
   bool writeByte(uint8_t value);
@@ -109,6 +113,9 @@ class SyncWriteHandle {
  private:
   bool initialized_[MotorHandleFactory::kMaxDrivers];
   uint8_t state_ = 0;
+  uint8_t target_register_ = 0xff;
+  uint8_t n_bytes_ = 0;
+  uint8_t written_ = 0;
   DxlDriver* p_current_dxl_ = nullptr;
   MotorHandleFactory* p_motors_ = nullptr;
 };
@@ -118,6 +125,10 @@ class GenericHandle {
   GenericHandle() = default;
   GenericHandle(MotorHandleFactory* p_motor_driver, uint8_t id);
   ~GenericHandle();
+  GenericHandle(GenericHandle&) = delete;  // no copy constructor
+  GenericHandle& operator=(GenericHandle&) = delete;  // no copy assignment
+  GenericHandle(GenericHandle&&) = default; // default move constructor
+  GenericHandle& operator=(GenericHandle&&) = default;  // default move assignment
 
   bool setInstruction(uint8_t ins);
   bool writeByte(uint8_t value);
@@ -142,6 +153,10 @@ class FeedbackHandle {
   FeedbackHandle() = default;
   FeedbackHandle(MotorHandleFactory* p_motor_driver);
   ~FeedbackHandle();
+  FeedbackHandle(FeedbackHandle&) = delete;  // no copy constructor
+  FeedbackHandle& operator=(FeedbackHandle&) = delete;  // no copy assignment
+  FeedbackHandle(FeedbackHandle&&) = default; // default move constructor
+  FeedbackHandle& operator=(FeedbackHandle&&) = default;  // default move assignment
 
   /// Start reading all the motors. 
   /// ***THIS FUNCTION BLOCKS UNTIL ALL MOTORS FEEDBACK IS PROCESSED.***
