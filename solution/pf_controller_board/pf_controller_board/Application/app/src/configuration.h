@@ -17,7 +17,7 @@
 #include "dma_spi.h"
 
 extern DmaSpiSlave DSPI;
-extern 
+extern MotorHandleFactory Motors;
 // Application specific initialization
 void initAppComponents();
 

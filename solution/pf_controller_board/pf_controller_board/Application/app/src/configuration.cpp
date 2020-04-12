@@ -25,16 +25,17 @@ static ExtendedSercom xsercom0{SERCOM0};
 static ExtendedSercom xsercom2{SERCOM2};
 static ExtendedSercom xsercom4{SERCOM4};
 
+
 static DmaUart dma_uart0 {
   &xsercom0,
-  2, 4,  // RX: Dma Channel 2, TX: DmaChannel 6
+  2, 6,  // RX: Dma Channel 2, TX: DmaChannel 6
   0, 1,  // RX: D0 (PA11 | PMUX-C),  TX: D1 (PA10 | PMUX-C) 
   SERCOM_RX_PAD_3, UART_TX_PAD_2   // PAD Settings
 };
 
 static DmaUart dma_uart1 { 
   &xsercom2,
-  3, 5,  // RX: Dma Channel 3, TX: Dma Channel 7
+  3, 7,  // RX: Dma Channel 3, TX: Dma Channel 7
   5, 4,  // RX: D5 (PA15 | PMUX-C), TX: D4 (PA08 | PMUX-C)
   SERCOM_RX_PAD_3, UART_TX_PAD_0  // PAD Settings
 };
@@ -68,7 +69,7 @@ DmaSpiSlave DSPI {
   DmaSpiSlave::getRxPadFromMasterPad(PAD_SPI_TX, PAD_SPI_RX)
 };
 
-void Sercom4_Handler() {
+void Sercom4_Handler (void) {
   DSPI.doBeforeSpiStarts();  
 }
 
@@ -80,13 +81,13 @@ static void SpiEnd_Handler (void) {
 /// Application Specific initialization
 void initAppComponents() {
   // Initialize DMA
-  dma_common::init();
+  DmaCommon::init();
 
   // Initialize DMA SPI
   // Duplicated SS signal to trigger an action when SPI transfer complete (LED_PIN in this case)
+  DSPI.begin();
   pinMode(duplicated_pin_ss, INPUT);
   attachInterrupt(duplicated_pin_ss, &SpiEnd_Handler, RISING);
-  DSPI.begin();
 
   // Initialize DMA UART
   dma_uart0.begin(kUartBaudrate);
@@ -101,4 +102,5 @@ void initAppComponents() {
   Motors.addDriver(dxl0);
   Motors.addDriver(dxl1);
   Motors.init();
+  
 };

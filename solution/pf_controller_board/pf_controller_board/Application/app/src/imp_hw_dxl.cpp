@@ -67,4 +67,5 @@ void ImpHwDxl::beginTransmission(uint8_t* tx_buf, size_t tx_buf_size, size_t exp
   tx_done_ = false;
   last_tx_usec_ = micros();
   setTxDirection();
+  p_hw_driver_->write(tx_buf, tx_buf_size);
 }

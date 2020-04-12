@@ -16,8 +16,8 @@
 
 void setup() {
   // put your setup code here, to run once:
-  SerialUSB.begin(1000000);
   initAppComponents();
+  SerialUSB.begin(1000000);
   delayMicroseconds(100);
 }
 
@@ -26,5 +26,9 @@ uint8_t dma_test[] = "dma testload\n";
 void loop() {
   volatile int x;
   SerialUSB.println("Test");
+  auto handle = Motors.createFeedbackHandle();
+  handle.readAllMotors();
+  auto m0 = handle.getFeedback(0);
+  SerialUSB.println(m0.position);
   delay(1000);
 }

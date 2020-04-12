@@ -163,7 +163,7 @@ class FeedbackHandle {
   bool readAllMotors();
   
   /// Get feedback data for a particular motor
-  MotorFeedbackData getData(uint8_t id);
+  MotorFeedbackData getFeedback(uint8_t id);
   
   /// Closes the driver,
   bool close();

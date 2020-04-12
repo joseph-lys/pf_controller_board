@@ -505,7 +505,7 @@ bool FeedbackHandle::readAllMotors() {
   }
   return is_done;
 }
-MotorFeedbackData FeedbackHandle::getData(uint8_t id) {
+MotorFeedbackData FeedbackHandle::getFeedback(uint8_t id) {
   MotorFeedbackData feedback{};  // return empty data by default
   if (p_motors_ == nullptr) {
     // invalid handle
