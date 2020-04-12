@@ -52,8 +52,8 @@ class ImpHwDxl : public IfHwDxlDriverBase {
   bool isTimeout() override;
 
   /// Read one byte from the DMA UART driver
-  /// @return a byte of data
-  uint8_t read() override;
+  /// @return a byte of data, return -1 if error
+  int read() override;
 
   /// Starts a transmission.
   /// @param tx_buf buffer containing the data source used to send

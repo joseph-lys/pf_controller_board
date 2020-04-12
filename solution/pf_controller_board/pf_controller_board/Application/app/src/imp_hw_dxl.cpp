@@ -51,6 +51,10 @@ bool ImpHwDxl::isTimeout() {
   return is_timeout;
 }
 
+int ImpHwDxl::read() {
+  return p_hw_driver_->read();
+}
+
 void ImpHwDxl::beginTransmission(uint8_t* tx_buf, size_t tx_buf_size, size_t expected_reply_size) {
   usec_t x;
   

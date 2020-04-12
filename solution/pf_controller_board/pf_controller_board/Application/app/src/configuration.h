@@ -13,12 +13,11 @@
 #define CONFIGURATION_H_
 
 
-#include "dma_uart.h"
+#include "motor_driver.h"
 #include "dma_spi.h"
 
-extern DmaUart DSerial;
 extern DmaSpiSlave DSPI;
-
+extern 
 // Application specific initialization
 void initAppComponents();
 
