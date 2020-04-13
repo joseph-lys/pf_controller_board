@@ -20,5 +20,6 @@ extern DmaSpiSlave DSPI;
 extern MotorHandleFactory Motors;
 // Application specific initialization
 void initAppComponents();
+void SpiEnd_Handler();
 
 #endif /* CONFIGURATION_H_ */

@@ -69,11 +69,11 @@ DmaSpiSlave DSPI {
   DmaSpiSlave::getRxPadFromMasterPad(PAD_SPI_TX, PAD_SPI_RX)
 };
 
-void Sercom4_Handler (void) {
+void SERCOM4_Handler (void) {
   DSPI.doBeforeSpiStarts();  
 }
 
-static void SpiEnd_Handler (void) {
+void SpiEnd_Handler (void) {
   DSPI.doAfterSpiStops();
 }
 
@@ -85,9 +85,9 @@ void initAppComponents() {
 
   // Initialize DMA SPI
   // Duplicated SS signal to trigger an action when SPI transfer complete (LED_PIN in this case)
-  DSPI.begin();
-  pinMode(duplicated_pin_ss, INPUT);
+  pinMode(duplicated_pin_ss, INPUT_PULLUP);
   attachInterrupt(duplicated_pin_ss, &SpiEnd_Handler, RISING);
+  DSPI.begin();
 
   // Initialize DMA UART
   dma_uart0.begin(kUartBaudrate);
