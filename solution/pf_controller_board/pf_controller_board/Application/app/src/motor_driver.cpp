@@ -18,9 +18,19 @@ typedef unsigned int uint;
 /// MotorDriver
 //////////////////////////////////////////////////////////////////////////
 MotorHandleFactory::MotorHandleFactory() {
-  p_id_mappings_ = new uint8_t[kMaxMotors]{kNoDriver};
-  p_drivers_ = new DxlDriver*[kMaxDrivers]{nullptr};
+  int i;
+  p_id_mappings_ = new uint8_t[kMaxMotors];
+  p_drivers_ = new DxlDriver*[kMaxDrivers];
   p_feedbacks_ = new MotorFeedbackData[kMaxMotors];
+  for (i=0; i<kMaxMotors; i++) {
+    p_id_mappings_[i] = 0xff;
+  }
+  for (i=0; i<kMaxDrivers; i++) {
+    p_drivers_[i] = nullptr;
+  }
+  for (i=0; i<kMaxMotors; i++) {
+    p_feedbacks_[i] = MotorFeedbackData{};
+  }
 }
 
 MotorHandleFactory::~MotorHandleFactory() {
@@ -50,7 +60,7 @@ bool MotorHandleFactory::pingMotor(uint8_t id) {
   bool is_found = false;
   uint i;
   DxlDriver* driver;
-  DxlDriver::Status status;
+  volatile DxlDriver::Status status;
   if (id < static_cast<uint>(kMaxMotors)) {
     for (i=0u; i<static_cast<uint>(n_drivers_); i++) {
       driver = p_drivers_[i];
@@ -437,26 +447,30 @@ FeedbackHandle::~FeedbackHandle() {
 bool FeedbackHandle::readAllMotors() {
   bool is_done = false;
   DxlDriver* driver;
-  uint8_t id;
+  uint8_t id, id_feedback;
   uint8_t idx;
+  bool loop_done;
   if (p_motors_ == nullptr) {
     // invalid handle
   } else if (combined_state_ != kInitial) {
     // out of sequence call, return default value false
   } else {
+    for (id=0; id<MotorHandleFactory::kMaxMotors; id++) {
+      /// clear the feedback data
+      p_motors_->p_feedbacks_[id] = MotorFeedbackData{};
+    }
     while (1) {
-      bool loop_done = true;
+      loop_done = true;
       /// Trigger request for each Motor
-      for (id=(uint8_t)0; id<MotorHandleFactory::kMaxMotors; id++) {
-        if (p_motors_->p_feedbacks_[id].status == 0) {
+      for (id=0; id<MotorHandleFactory::kMaxMotors; id++) {
+        if (p_motors_->p_feedbacks_[id].isValid()) {
           continue;  // already obtained valid data, do nothing
         } 
-        loop_done = false; // getting here means there are unread motors
-        
         idx = p_motors_->getDriverIndex(id);
-        if (idx >= p_motors_->n_drivers_) {
+        if (idx >= MotorHandleFactory::kMaxDrivers) {
           continue;  // not a valid id, do not do anything
-        } 
+        }
+        loop_done = false; // getting here means there are unread motors
         if (states_[idx] == kInTransit) {
           continue;  // in transit, do nothing
         }
@@ -478,7 +492,7 @@ bool FeedbackHandle::readAllMotors() {
           case DxlDriver::Status::kDone:
             states_[idx] = kInitial;
             id = driver->getRxId();
-            if (id >= p_motors_->n_drivers_) {
+            if (id != id_feedback) {
               break;  // some error on the reply data!
             }
             p_motors_->p_feedbacks_[id].status = driver->getRxStatusByte();
@@ -496,9 +510,9 @@ bool FeedbackHandle::readAllMotors() {
             loop_done = false; // getting here means there are busy drivers
             break;
         }
-        if (loop_done) {
-          break;  // break out of the for loop
-        }
+      }
+      if (loop_done) {
+        break;  // break out of the for loop
       }
     }
     combined_state_ = kTransactionComplete;

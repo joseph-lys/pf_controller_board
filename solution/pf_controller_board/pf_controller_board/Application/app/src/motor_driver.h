@@ -79,7 +79,7 @@ private:
   DxlDriver** p_drivers_ = nullptr;
   MotorFeedbackData* p_feedbacks_ = nullptr; 
   inline uint8_t getDriverIndex(uint8_t id) { 
-    return (id < kMaxMotors) ? p_id_mappings_[id] : 0xff; 
+    return (id < kMaxDrivers) ? p_id_mappings_[id] : 0xff; 
   }
 
   inline DxlDriver* getDxlDriver(uint8_t id) { 

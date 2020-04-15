@@ -15,7 +15,7 @@
 ImpHwDxl::ImpHwDxl(DmaUart& dma_uart, uint8_t dir_pin, uint32_t dir_tx_value) : 
 dir_pin_(dir_pin),
 dir_tx_value_(static_cast<uint8_t>(dir_tx_value)),
-dir_rx_value_(static_cast<uint8_t>(dir_rx_value_ == HIGH ? LOW : HIGH)),
+dir_rx_value_(static_cast<uint8_t>((dir_tx_value_ == HIGH) ? LOW : HIGH)),
 p_hw_driver_(&dma_uart) {
   p_hw_driver_->setTxDoneCallback(Callback(*this, &ImpHwDxl::doWhenTxDone));
   setRxDirection();
@@ -45,7 +45,7 @@ bool ImpHwDxl::txIsDone() {
 
 bool ImpHwDxl::isTimeout() {
   bool is_timeout = false;
-  if (timeout_tx_usec_) {
+  if (timeout_tx_usec_ != 0 && tx_done_) {
     is_timeout = timeout_tx_usec_ < (micros() - last_tx_usec_);
   }
   return is_timeout;
@@ -57,15 +57,14 @@ int ImpHwDxl::read() {
 
 void ImpHwDxl::beginTransmission(uint8_t* tx_buf, size_t tx_buf_size, size_t expected_reply_size) {
   usec_t x;
-  
   x = baud_per_byte_ * static_cast<usec_t>(tx_buf_size + expected_reply_size);
   x *= usec_per_128baud_;
   x += 63ul;  // rounding factor
   x >>= 7;  // divide by 128
   x += usec_delays_;
+  setTxDirection();
   timeout_tx_usec_ = x;
   tx_done_ = false;
   last_tx_usec_ = micros();
-  setTxDirection();
   p_hw_driver_->write(tx_buf, tx_buf_size);
 }

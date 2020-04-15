@@ -73,7 +73,7 @@ class ImpHwDxl : public IfHwDxlDriverBase {
   
   /// Hardcoded for now
   usec_t usec_per_128baud_ = (1000000ull * 128ull + 500000ull) / 1000000ull;  // (1000000 * 128 + (BAUD_PER_SEC / 2)) / BAUD_PER_SEC
-  usec_t baud_per_byte_ = 14;  // number of bauds per byte of transfer, including some safety factor
+  usec_t baud_per_byte_ = 20;  // number of bauds per byte of transfer, including some safety factor
   usec_t usec_delays_ = 255;  // constant representing the sum of all other delay (transmission, response etc)
 
 };
