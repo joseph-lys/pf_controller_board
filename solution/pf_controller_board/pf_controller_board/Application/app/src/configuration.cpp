@@ -99,20 +99,17 @@ void SpiEnd_Handler (void) {
 void initAppComponents() {
   
   // Pin configuration
-  pinMode(kPinRxUart0, INPUT_PULLUP);
+  pinMode(kPinRxUart0, INPUT);
   pinPeripheral(kPinRxUart0, PIO_SERCOM);
   pinMode(kPinTxUart0, OUTPUT);
   pinPeripheral(kPinTxUart0, PIO_SERCOM);
   pinMode(kPinDirUart0, OUTPUT);
   
-  pinMode(kPinRxUart1, INPUT_PULLUP);
+  pinMode(kPinRxUart1, INPUT);
   pinPeripheral(kPinRxUart1, PIO_SERCOM);
   pinMode(kPinTxUart1, OUTPUT);
   pinPeripheral(kPinTxUart1, PIO_SERCOM_ALT);
   pinMode(kPinDirUart1, OUTPUT);
-  
-  // Initialize DMA
-  DmaCommon::init();
 
   // Initialize DMA SPI
   // Duplicated SS signal to trigger an action when SPI transfer complete (LED_PIN in this case)
@@ -120,6 +117,10 @@ void initAppComponents() {
   attachInterrupt(kPinSSDuplicate, &SpiEnd_Handler, RISING);
   // DSPI.begin();
 
+  
+  // Initialize DMA
+  DmaCommon::init();
+  
   // Initialize DMA UART
   dma_uart0.begin(kUartBaudrate);
   dma_uart1.begin(kUartBaudrate);

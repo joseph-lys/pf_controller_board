@@ -23,9 +23,11 @@ p_hw_driver_(&dma_uart) {
 
 void ImpHwDxl::setTxDirection() {
   digitalWrite(static_cast<uint32_t>(dir_pin_), static_cast<uint32_t>(dir_tx_value_));
+  delayMicroseconds(2);
 }
 
 void ImpHwDxl::setRxDirection() {
+  delayMicroseconds(2);
   digitalWrite(static_cast<uint32_t>(dir_pin_), static_cast<uint32_t>(dir_rx_value_));
 }
 
@@ -35,6 +37,10 @@ uint32_t ImpHwDxl::doWhenTxDone(uint32_t, uint32_t) {
 }
 
 size_t ImpHwDxl::available() {
+  bool is_timeout = false;
+  #ifdef DEBUG
+  volatile auto x = p_hw_driver_->available();
+  #endif
   return p_hw_driver_->available();
 }
 
@@ -45,8 +51,11 @@ bool ImpHwDxl::txIsDone() {
 
 bool ImpHwDxl::isTimeout() {
   bool is_timeout = false;
+  #ifdef DEBUG
+  volatile auto t = micros();
+  #endif
   if (timeout_tx_usec_ != 0 && tx_done_) {
-    is_timeout = timeout_tx_usec_ < (micros() - last_tx_usec_);
+    is_timeout = (micros() - last_tx_usec_) > timeout_tx_usec_;
   }
   return is_timeout;
 }

@@ -17,13 +17,11 @@
 
 /// Struct to store feedback data
 struct MotorFeedbackData {  // make this data fixed, simpler
+  bool valid = false;
   uint8_t status = 0xff;
   uint16_t position = 0xffff;
   uint16_t speed = 0xffff;
   uint16_t torque = 0xffff;
-  bool isValid() const {
-    return (status != 0xff || position != 0xffff || speed != 0xffff || torque != 0xffff);
-  }
 };
 
 /// handles for different purposes
@@ -174,9 +172,9 @@ class FeedbackHandle {
   MotorHandleFactory* p_motors_ = nullptr;
   enum Constants : uint8_t {
     kFirstReg = 36,
-    kByteSize = 6
+    kByteSize = 6,
+    kMaxRetry = 3
   };
-
 };
 
 }  // namespace motor_handles
