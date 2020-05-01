@@ -58,11 +58,11 @@ void MotorHandleFactory::init() {
 
 bool MotorHandleFactory::pingMotor(uint8_t id) {
   bool is_found = false;
-  uint i;
+  uint8_t i;
   DxlDriver* driver;
   volatile DxlDriver::Status status;
   if (id < static_cast<uint>(kMaxMotors)) {
-    for (i=0u; i<static_cast<uint>(n_drivers_); i++) {
+    for (i=0; i<n_drivers_; i++) {
       driver = p_drivers_[i];
       driver->setTxIns(id, DxlProtocolV1::Ins::kPing);
       driver->beginTransmission();

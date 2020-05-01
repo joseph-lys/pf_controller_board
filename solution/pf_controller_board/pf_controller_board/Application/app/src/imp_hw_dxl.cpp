@@ -23,11 +23,13 @@ p_hw_driver_(&dma_uart) {
 
 void ImpHwDxl::setTxDirection() {
   digitalWrite(static_cast<uint32_t>(dir_pin_), static_cast<uint32_t>(dir_tx_value_));
-  delayMicroseconds(2);
 }
 
 void ImpHwDxl::setRxDirection() {
-  delayMicroseconds(2);
+  volatile int x = 0;
+   while (x++ < 3) {  // need to add some delay, line may still be busy
+     yield;
+  }
   digitalWrite(static_cast<uint32_t>(dir_pin_), static_cast<uint32_t>(dir_rx_value_));
 }
 

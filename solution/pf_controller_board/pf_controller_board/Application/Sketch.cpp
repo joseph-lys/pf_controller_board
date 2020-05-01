@@ -24,13 +24,14 @@ void setup() {
 void loop() {
   volatile long int x, y;
   SerialUSB.println("Test");
-  auto handle = Motors.createFeedbackHandle();
-  x = micros();
-  handle.readAllMotors();
-  y = micros();
-  auto m0 = handle.getFeedback(0);
-  SerialUSB.println(m0.position);
-  auto m1 = handle.getFeedback(1);
-  SerialUSB.println(m1.position);
-  delay(2000);
+//  auto handle = Motors.createFeedbackHandle();
+//  x = micros();
+//  handle.readAllMotors();
+//  y = micros();
+//  auto m0 = handle.getFeedback(0);
+//  SerialUSB.println(m0.position);
+//  auto m1 = handle.getFeedback(1);
+//  SerialUSB.println(m1.position);
+   Motors.pingMotor(1);
+  delay(1000);
 }

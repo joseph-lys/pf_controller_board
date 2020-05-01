@@ -8,14 +8,16 @@
 /// Application assets
 ///
 
-#include "configuration.h"
 #include <Arduino.h>
 #include "wiring_private.h"
 #include "dma_common.h"
+#include "dma_uart.h"
+#include "dma_spi.h"
 #include "extended_sercom.h"
 #include "imp_hw_dxl.h"
 #include "DxlProtocolV1.h"
 #include "DxlDriver.h"
+#include "motor_driver.h"
 
 
 static constexpr unsigned long kUartBaudrate = 1000000ul;
@@ -99,13 +101,13 @@ void SpiEnd_Handler (void) {
 void initAppComponents() {
   
   // Pin configuration
-  pinMode(kPinRxUart0, INPUT);
+  pinMode(kPinRxUart0, INPUT_PULLUP);
   pinPeripheral(kPinRxUart0, PIO_SERCOM);
   pinMode(kPinTxUart0, OUTPUT);
   pinPeripheral(kPinTxUart0, PIO_SERCOM);
   pinMode(kPinDirUart0, OUTPUT);
   
-  pinMode(kPinRxUart1, INPUT);
+  pinMode(kPinRxUart1, INPUT_PULLUP);
   pinPeripheral(kPinRxUart1, PIO_SERCOM);
   pinMode(kPinTxUart1, OUTPUT);
   pinPeripheral(kPinTxUart1, PIO_SERCOM_ALT);
@@ -128,6 +130,5 @@ void initAppComponents() {
   // Initialized the motor interface
   Motors.addDriver(dxl0);
   Motors.addDriver(dxl1);
-  Motors.init();
-  
+//  Motors.init();
 };

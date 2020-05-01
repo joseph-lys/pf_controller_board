@@ -22,7 +22,7 @@ extern DmaUart dma_uart1;
 extern DmaSpiSlave DSPI;
 extern MotorHandleFactory Motors;
 // Application specific initialization
-void initAppComponents();
-void SpiEnd_Handler();
+extern void initAppComponents();
+extern void SpiEnd_Handler();
 
 #endif /* CONFIGURATION_H_ */
