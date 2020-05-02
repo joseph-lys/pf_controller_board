@@ -19,6 +19,8 @@
 
 extern DmaUart dma_uart0;
 extern DmaUart dma_uart1;
+extern DxlDriver dxl0;
+extern DxlDriver dxl1;
 extern DmaSpiSlave DSPI;
 extern MotorHandleFactory Motors;
 // Application specific initialization

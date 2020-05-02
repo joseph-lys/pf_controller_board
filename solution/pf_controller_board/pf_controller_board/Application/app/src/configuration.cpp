@@ -61,10 +61,10 @@ static ImpHwDxl imp_hw_dxl1 {
 };
 
 /// Protocol V1, 80 byte write buffer, 16 byte read buffer
-static DxlDriver dxl0 = DxlDriver::create<DxlProtocolV1, 80, 16>(imp_hw_dxl0);
+DxlDriver dxl0 = DxlDriver::create<DxlProtocolV1, 80, 16>(imp_hw_dxl0);
 
 /// Protocol V1, 80 byte write buffer, 16 byte read buffer
-static DxlDriver dxl1 = DxlDriver::create<DxlProtocolV1, 80, 16>(imp_hw_dxl1);
+DxlDriver dxl1 = DxlDriver::create<DxlProtocolV1, 80, 16>(imp_hw_dxl1);
 
 MotorHandleFactory Motors{};
 
@@ -127,8 +127,9 @@ void initAppComponents() {
   dma_uart0.begin(kUartBaudrate);
   dma_uart1.begin(kUartBaudrate);
   
+  delay(1000);
   // Initialized the motor interface
   Motors.addDriver(dxl0);
   Motors.addDriver(dxl1);
-  Motors.init();
+  // Motors.init();
 };

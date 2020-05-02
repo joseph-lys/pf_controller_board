@@ -9,9 +9,9 @@
 /// provide specific handles to read and write data on the motors
 ///
 
+#include <Arduino.h>
 #include "motor_driver.h"
 #include "DxlProtocolV1.h"
-
 typedef unsigned int uint;
 
 //////////////////////////////////////////////////////////////////////////
@@ -66,8 +66,10 @@ bool MotorHandleFactory::pingMotor(uint8_t id) {
       driver = p_drivers_[i];
       driver->setTxIns(id, DxlProtocolV1::Ins::kPing);
       driver->beginTransmission();
+      volatile uint32_t DEBUG_X = micros();
       for(;;) {
         status = driver->poll();
+        volatile uint32_t DEBUG_Y = micros();
         if (status == DxlDriver::kErrorInvalidReceiveData
             || status == DxlDriver::kErrorInvalidTransmitData 
             || status == DxlDriver::kErrorTimeout) {
@@ -507,8 +509,10 @@ bool FeedbackHandle::readAllMotors() {
         if (states_[driver_idx] != kInTransit) {
           continue;  // not in transit, no need to poll
         }
+        loop_done = false; // getting here means there are busy drivers
         driver = p_motors_->p_drivers_[driver_idx];
-        switch(driver->poll()) {
+        auto driver_state = driver->poll();
+        switch(driver_state) {
           case DxlDriver::Status::kDone:
             states_[driver_idx] = kInitial;
             motor_id = driver->getRxId();
@@ -526,9 +530,7 @@ bool FeedbackHandle::readAllMotors() {
             states_[driver_idx] = kInitial;
             p_motors_->p_feedbacks_[request_id[driver_idx]].status = 0x80;
             break;
-          default:
-            loop_done = false; // getting here means there are busy drivers
-            break;
+          default: {}
         }
       }
       if (loop_done) {
