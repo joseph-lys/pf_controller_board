@@ -27,7 +27,7 @@ void ImpHwDxl::setTxDirection() {
 
 void ImpHwDxl::setRxDirection() {
   volatile int x = 0;
-   while (x++ < 3) {  // need to add some delay, line may still be busy
+   while (x++ < 5) {  // need to add some delay, line may still be busy
      yield;
   }
   digitalWrite(static_cast<uint32_t>(dir_pin_), static_cast<uint32_t>(dir_rx_value_));
@@ -39,10 +39,6 @@ uint32_t ImpHwDxl::doWhenTxDone(uint32_t, uint32_t) {
 }
 
 size_t ImpHwDxl::available() {
-  bool is_timeout = false;
-  #ifdef DEBUG
-  volatile auto x = p_hw_driver_->available();
-  #endif
   return p_hw_driver_->available();
 }
 
@@ -53,9 +49,6 @@ bool ImpHwDxl::txIsDone() {
 
 bool ImpHwDxl::isTimeout() {
   bool is_timeout = false;
-  #ifdef DEBUG
-  volatile auto t = micros();
-  #endif
   if (timeout_tx_usec_ != 0 && tx_done_) {
     is_timeout = (micros() - last_tx_usec_) > timeout_tx_usec_;
   }
@@ -72,7 +65,10 @@ void ImpHwDxl::beginTransmission(uint8_t* tx_buf, size_t tx_buf_size, size_t exp
   x *= usec_per_128baud_;
   x += 63ul;  // rounding factor
   x >>= 7;  // divide by 128
-  x += usec_delays_;
+  x += usec_transmission_delay_;
+  if (expected_reply_size > 0) {
+    x += usec_reception_delay_;
+  }
   setTxDirection();
   timeout_tx_usec_ = x;
   tx_done_ = false;

@@ -47,8 +47,8 @@ void MotorHandleFactory::addDriver(DxlDriver& driver) {
 
 void MotorHandleFactory::init() {
   uint8_t i, id;
-  for (id=0u; id<kMaxMotors; id++) {
-    for (i= 0; i<3; i++) {  // multiple tries to avoid missing motors
+  for (i= 0; i<3; i++) {  // multiple tries to avoid missing motors
+    for (id=0u; id<kMaxMotors; id++) {
       if(pingMotor(id)) {
         break;
       }
@@ -71,14 +71,18 @@ bool MotorHandleFactory::pingMotor(uint8_t id) {
         if (status == DxlDriver::kErrorInvalidReceiveData
             || status == DxlDriver::kErrorInvalidTransmitData 
             || status == DxlDriver::kErrorTimeout) {
-          is_found = false;
           break;
         }
         if (status == DxlDriver::kDone) {
-          is_found = true;
-          p_id_mappings_[id] = i;  // assign the index of the driver
+          if (driver->getRxId()==id) {
+            is_found = true;
+            p_id_mappings_[id] = i;  // assign the index of the driver
+          }          
           break;
         }
+      }
+      if (is_found) {
+        break;
       }
     }
   }
@@ -456,7 +460,16 @@ bool FeedbackHandle::readAllMotors() {
   uint8_t request_id[MotorHandleFactory::kMaxDrivers];
   uint8_t retries[MotorHandleFactory::kMaxMotors];
   for (motor_id=0; motor_id<MotorHandleFactory::kMaxMotors; motor_id++) {
-    retries[motor_id] = 0;
+    driver_idx = p_motors_->getDriverIndex(motor_id);
+    if (driver_idx >= MotorHandleFactory::kMaxDrivers) {
+      retries[motor_id] = kMaxRetry;
+    } else {
+      retries[motor_id] = 0;      
+    }
+  }
+  for (driver_idx=0; driver_idx<MotorHandleFactory::kMaxDrivers; driver_idx++) {
+    request_id[driver_idx] = 0xff;
+    states_[driver_idx] = kInitial;
   }
   if (p_motors_ == nullptr) {
     // invalid handle
@@ -471,14 +484,10 @@ bool FeedbackHandle::readAllMotors() {
       loop_done = true;
       /// Trigger request for each Motor
       for (motor_id=0; motor_id<MotorHandleFactory::kMaxMotors; motor_id++) {
-        if (retries[i] >= kMaxRetry) {
+        if (retries[motor_id] >= kMaxRetry) {
           continue;  // already obtained valid data, do nothing
         } 
         driver_idx = p_motors_->getDriverIndex(motor_id);
-        if (driver_idx >= MotorHandleFactory::kMaxDrivers) {
-          retries[motor_id] = kMaxRetry;
-          continue;  // not a valid id, do not do anything
-        }
         loop_done = false; // getting here means there are unread motors
         if (states_[driver_idx] == kInTransit) {
           continue;  // driver is busy, try again later
@@ -515,7 +524,7 @@ bool FeedbackHandle::readAllMotors() {
           case DxlDriver::Status::kErrorInvalidTransmitData:
           case DxlDriver::Status::kErrorTimeout:
             states_[driver_idx] = kInitial;
-            p_motors_->p_feedbacks_[motor_id].status = 0x80;
+            p_motors_->p_feedbacks_[request_id[driver_idx]].status = 0x80;
             break;
           default:
             loop_done = false; // getting here means there are busy drivers

@@ -173,7 +173,7 @@ class FeedbackHandle {
   enum Constants : uint8_t {
     kFirstReg = 36,
     kByteSize = 6,
-    kMaxRetry = 3
+    kMaxRetry = 1
   };
 };
 

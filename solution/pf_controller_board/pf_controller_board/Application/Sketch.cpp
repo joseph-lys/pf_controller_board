@@ -16,22 +16,19 @@
 
 void setup() {
   // put your setup code here, to run once:
+  delay(1000);
   initAppComponents();
   SerialUSB.begin(0);
-  delay(500);
 }
 
 void loop() {
   volatile long int x, y;
   SerialUSB.println("Test");
-//  auto handle = Motors.createFeedbackHandle();
-//  x = micros();
-//  handle.readAllMotors();
-//  y = micros();
-//  auto m0 = handle.getFeedback(0);
-//  SerialUSB.println(m0.position);
-//  auto m1 = handle.getFeedback(1);
-//  SerialUSB.println(m1.position);
-   Motors.pingMotor(1);
+  auto handle = Motors.createFeedbackHandle();
+  handle.readAllMotors();
+  auto m1 = handle.getFeedback(1);
+  SerialUSB.println(m1.position);
+  Motors.pingMotor(1);
+  // Motors.pingMotor(2);
   delay(1000);
 }
