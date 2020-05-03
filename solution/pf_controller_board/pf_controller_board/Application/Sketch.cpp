@@ -96,26 +96,12 @@ void loop() {
   dxl0.writeTxByte(kByteSize);
   dxl0.beginTransmission();
   start_time = micros();
-  while (1) {
-    auto status = dxl0.poll();    
-    if (status==DxlDriver::kErrorTimeout) {
-      logData(-1, micros() - start_time);
-      break;
-    }
-    if (status==DxlDriver::kErrorInvalidReceiveData) {
-      logData(-2, micros() - start_time);
-      break;
-    }
-    if (status==DxlDriver::kDone) {
-      logData(1, micros() - start_time);
-      id = dxl0.getRxId();
-      pos = dxl0.readRxWord();
-      spd = dxl0.readRxWord();
-      torq = dxl0.readRxWord();
-      auto x = 0;
-      break;
-    }
-  }
-  SerialUSB.println(id);
-  //delay(1000);
+  auto handle = Motors.createFeedbackHandle();
+  handle.readAllMotors();
+  auto feedback = handle.getFeedback(1);
+  if (feedback.valid)
+  logData(int status, micros() - start_time);
+  SerialUSB.println(handle.getFeedback(1).speed);
+  handle.close();
+  delay(1000);
 }
