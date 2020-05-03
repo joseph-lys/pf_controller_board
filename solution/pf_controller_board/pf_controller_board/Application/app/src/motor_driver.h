@@ -75,7 +75,7 @@ friend motor_handles::SyncWriteHandle;
   bool driver_lock_[kNoDriver];
   uint8_t n_drivers_ = 0;
   uint8_t* p_id_mappings_ = nullptr;
-  DxlDriver** p_drivers_ = nullptr;
+  DxlDriver* p_drivers_ = nullptr;
   MotorFeedbackData* p_feedbacks_ = nullptr; 
   inline uint8_t getDriverIndex(uint8_t id) { 
     return (id < kMaxDrivers) ? p_id_mappings_[id] : 0xff; 
@@ -139,12 +139,14 @@ class SingleHandle {
   public:
   SingleHandle();
   explicit SingleHandle(DxlDriver* driver, uint8_t id, uint8_t ins);
-  ~SingleHandle();
+  virtual ~SingleHandle();
 
   virtual bool writeByte(uint8_t value);
   virtual bool writeWord(uint16_t value);
   virtual bool startTransmission();
-  virtual bool poll();
+  /// poll for transaction completion
+  /// @returns 0: done, 1: not complete, -1 any error
+  virtual int poll();
   virtual uint8_t getMotorId();
   virtual uint8_t getMotorStatus();
   virtual uint8_t readByte();
@@ -152,17 +154,19 @@ class SingleHandle {
   
  protected:
   uint8_t state_ = 0;
+  uint8_t const id_ = 0xff;
+  uint8_t const ins_ = 0xff; 
   DxlDriver* p_driver_ = nullptr;
 };
 
 class BroadcastHandle : public SingleHandle {
-  explicit BroadcastHandle(MotorHandleFactory* p_motor_driver, uint8_t id, uint8_t ins);
+  explicit BroadcastHandle(MotorHandleFactory* p_motors, uint8_t ins);
   ~BroadcastHandle();
   
   bool writeByte(uint8_t value) override;
   bool writeWord(uint16_t value) override;
   bool startTransmission() override;
-  bool poll() override;
+  int poll() override;
   uint8_t getMotorId() override;
   uint8_t getMotorStatus() override;
   uint8_t readByte() override;
@@ -170,10 +174,13 @@ class BroadcastHandle : public SingleHandle {
 
  private:
   MotorHandleFactory* p_motor_ = nullptr;
+  SingleHandle* handles_ = nullptr;
 };
 
 
-
+/// Handle that encapsulates both transaction to single motor as well as broadcast
+/// Also handles resource management via lock/release mechanism.
+/// To release driver call the close() function
 class GenericHandle {
  public:
   GenericHandle() = default;
