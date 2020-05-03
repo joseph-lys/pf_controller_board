@@ -74,8 +74,8 @@ class ImpHwDxl : public IfHwDxlDriverBase {
   /// Hardcoded for now
   const usec_t usec_per_128baud_ = (1000000ull * 128ull + 500000ull) / 1000000ull;  // (1000000 * 128 + (BAUD_PER_SEC / 2)) / BAUD_PER_SEC
   const usec_t baud_per_byte_ = 20;  // number of bauds per byte of transfer, including some safety factor
-  const usec_t usec_transmission_delay_ = 1000;  // constant representing the sum of all transmission delay (transfer delay, motor processing time, etc)
-  const usec_t usec_reception_delay_ = 10000;  // constant representing the sum of all receiving delay (motor response delay, etc)
+  const usec_t usec_transmission_delay_ = 750;  // constant representing the sum of all transmission delay (transfer delay, motor processing time, etc)
+  const usec_t usec_reception_delay_ = 250 + 500;  // constant representing the sum of all receiving delay (motor response delay, etc)
 
 };
 
