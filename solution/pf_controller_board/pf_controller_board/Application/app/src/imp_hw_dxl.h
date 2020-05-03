@@ -52,8 +52,8 @@ class ImpHwDxl : public IfHwDxlDriverBase {
   bool isTimeout() override;
 
   /// Read one byte from the DMA UART driver
-  /// @return a byte of data
-  uint8_t read() override;
+  /// @return a byte of data, return -1 if error
+  int read() override;
 
   /// Starts a transmission.
   /// @param tx_buf buffer containing the data source used to send
@@ -72,9 +72,10 @@ class ImpHwDxl : public IfHwDxlDriverBase {
   usec_t timeout_tx_usec_ = 0;
   
   /// Hardcoded for now
-  usec_t usec_per_128baud_ = (1000000ull * 128ull + 500000ull) / 1000000ull;  // (1000000 * 128 + (BAUD_PER_SEC / 2)) / BAUD_PER_SEC
-  usec_t baud_per_byte_ = 14;  // number of bauds per byte of transfer, including some safety factor
-  usec_t usec_delays_ = 255;  // constant representing the sum of all other delay (transmission, response etc)
+  const usec_t usec_per_128baud_ = (1000000ull * 128ull + 500000ull) / 1000000ull;  // (1000000 * 128 + (BAUD_PER_SEC / 2)) / BAUD_PER_SEC
+  const usec_t baud_per_byte_ = 20;  // number of bauds per byte of transfer, including some safety factor
+  const usec_t usec_transmission_delay_ = 750;  // constant representing the sum of all transmission delay (transfer delay, motor processing time, etc)
+  const usec_t usec_reception_delay_ = 250 + 500;  // constant representing the sum of all receiving delay (motor response delay, etc)
 
 };
 
