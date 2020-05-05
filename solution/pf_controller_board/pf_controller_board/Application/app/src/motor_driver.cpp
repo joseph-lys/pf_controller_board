@@ -21,10 +21,12 @@ MotorHandleFactory::MotorHandleFactory() {
   int i;
   p_id_mappings_ = new uint8_t[kMaxMotors];
   p_drivers_ = new DxlDriver*[kMaxDrivers];
-  p_feedbacks_ = new MotorFeedbackData[kMaxMotors];
+  p_request_id_ = new uint8_t[kMaxDrivers];
+  p_retries_ = new uint8_t[kMaxDrivers];
+  p_handles_ = new motor_handles::SingleHandle[kMaxDrivers];
+
   for (i=0; i<kMaxMotors; i++) {
     p_id_mappings_[i] = 0xff;
-    p_feedbacks_[i] = MotorFeedbackData{};
   }
   for (i=0; i<kMaxDrivers; i++) {
     p_drivers_[i] = nullptr;
@@ -35,7 +37,9 @@ MotorHandleFactory::MotorHandleFactory() {
 MotorHandleFactory::~MotorHandleFactory() {
   delete[] p_id_mappings_;
   delete[] p_drivers_;
-  delete[] p_feedbacks_;
+  delete[] p_request_id_;
+  delete[] p_retries_;
+  delete[] p_handles_;
 }
 
 void MotorHandleFactory::addDriver(DxlDriver& driver) {
@@ -90,82 +94,175 @@ bool MotorHandleFactory::pingMotor(uint8_t id) {
   return is_found;
 }
 
+motor_handles::GenericHandle MotorHandleFactory::createWriteHandle(uint8_t id) {
+  return motor_handles::GenericHandle{this, id, DxlProtocolV1::Ins::kWrite};
+}
+
 motor_handles::SyncWriteHandle MotorHandleFactory::createSyncWriteHandle(uint8_t target_register, uint8_t number_of_bytes) {
-  if (aquireLockAll()) {
-    return motor_handles::SyncWriteHandle(this, target_register, number_of_bytes);  
-  } else {
-    return motor_handles::SyncWriteHandle();
+  return motor_handles::SyncWriteHandle(this, target_register, number_of_bytes);
+}
+
+
+uint8_t MotorHandleFactory::countDrivers() {
+  return n_drivers_;
+}
+
+void MotorHandleFactory::MappingQueue::build(uint8_t* mapping) {
+  uint8_t i, j;
+  for (i=0; i <kMaxDrivers; i++) {
+    if (i==0) {
+      start_[i] = 0;
+    } else {
+      start_[i] = end_[i - 1];
+    }
+    end_[i] = start_[i];
+    for(j=0; j<kMaxMotors; j++) {
+      if (i==mapping[j]) {
+        motor_ids_[end_[i]] = mapping[j];
+        end_[i]++;
+      }
+    }
   }
 }
 
-motor_handles::Handle MotorHandleFactory::createWriteHandle(uint8_t id) {
-  handle = motor_handles::Handle{};
-  if (aquireLockAll()) {
-    handle = motor_handles::SingleHandle{this, null, true};
-    handle.setInstruction(DxlProtocolV1::Ins::kWrite);  // specialize to a write type
-  }
-  return handle;
-}  
-
-motor_handles::FeedbackHandle MotorHandleFactory::createFeedbackHandle() {
-  return  motor_handles::FeedbackHandle(this);
+uint8_t MotorHandleFactory::MappingQueue::pop(uint8_t index) {
+  // unsafe
+  return motor_ids_[start_[index]++];
 }
 
+bool MotorHandleFactory::MappingQueue::hasItem(uint8_t index) {
+  // unsafe
+  return start_[index] < end_[index];
+}
+
+
+bool MotorHandleFactory::readAllMotors(MotorDataInterface& datas) {
+  if (!aquireLockAll()) {
+    return false;
+  }
+  DxlDriver* driver;
+  uint8_t i, motor_id;
+  uint8_t driver_idx;
+  uint8_t reg = datas.requestedRegister();
+  uint8_t len = datas.requestedLength();
+  uint8_t max_retries = datas.requestRetries();
+  int result;
+  bool loop_done;
+  
+  /// Data initialization
+  for (driver_idx=0; driver_idx<MotorHandleFactory::kMaxDrivers; driver_idx++) {
+    p_request_id_[driver_idx] = 0xff;
+    p_retries_[motor_id] = max_retries;
+  }
+  datas.initializeDatas();
+  queue_.build(p_id_mappings_);
+  /// Request/update loop
+  while (1) {
+    loop_done = true;
+      
+    for (driver_idx=0; driver_idx<n_drivers_; driver_idx++) {
+      if (p_handles_[driver_idx]) {
+        continue;  // driver is still busy, skip
+      }
+      if(p_retries_[driver_idx] >= max_retries && queue_.hasItem(driver_idx)) {
+        p_request_id_[driver_idx] = queue_.pop(driver_idx);
+        p_retries_[motor_id] = 0;
+      }
+      if (p_retries_[driver_idx] < max_retries) {
+        driver = getDriverPtr(motor_id);
+        p_handles_[driver_idx] = motor_handles::SingleHandle(driver);
+        p_handles_[driver_idx].setInstruction(motor_id, DxlProtocolV1::Ins::kRead);
+        p_handles_[driver_idx].writeByte(reg);
+        p_handles_[driver_idx].writeByte(len);
+        p_handles_[driver_idx].startTransmission();
+        p_request_id_[driver_idx] = motor_id;
+        p_retries_[motor_id]++;
+          
+        loop_done = false;
+      }
+    }
+    for (driver_idx=0; driver_idx<n_drivers_; driver_idx++) {
+      if (!p_handles_[driver_idx]) {  // idle driver, skip
+        continue;
+      }
+      result = p_handles_[driver_idx].poll();
+      if (result > 0) {  // still busy, skip
+        loop_done = false;
+        continue;
+      }
+      if (result == 0) {  // successful reply
+        if (p_request_id_[driver_idx] == p_handles_[driver_idx].getMotorId()) {
+          datas.replyFromHandle(p_handles_[driver_idx], p_request_id_[driver_idx]);
+          p_retries_[driver_idx] = max_retries;
+          } else {  // mismatch is an error
+          datas.errorFromHandle(p_request_id_[driver_idx]);
+        }
+        } else if (result < 0) {  // all other errors
+        datas.errorFromHandle(p_request_id_[driver_idx]);
+      }
+      p_handles_[driver_idx] = motor_handles::SingleHandle{};  // set to empty handle after processed
+    }
+    if (loop_done) {
+      break;  // break out of the for loop
+    }
+  }
+  releaseLockAll();
+  return true;
+}
 
 
 namespace motor_handles {
 
+
 enum TransactionState : uint8_t {
+  kUnitiliaized = 0xff,
   kInitial = 0,
   kInTransit,
   kTransactionComplete,
   kClosed,
 };
+
 //////////////////////////////////////////////////////////////////////////
-/// SINGLE HANDLE
+/// SINGLE TRANSACTION HANDLE
 //////////////////////////////////////////////////////////////////////////
-SingleHandle SingleHandle::create(MotorHandleFactory* p_motor_driver, uint8_t driver_idx) {
-  if (p_motor_driver->aquireLock(driver_idx)) {
-    return SingleHandle();
-  } else {
-    return SingleHandle(p_motor_driver, uint8_t driver_idx));
-  }
-}
 
 SingleHandle::SingleHandle()
-: state_(kClosed), p_driver_(nullptr) {
+: BaseHandle(kClosed), p_driver_(nullptr) {
 }
 
-SingleHandle::SingleHandle(DxlDriver* driver, uint8_t id, uint8_t ins)
-: state_(kInitial), id_(id), ins_(ins), p_driver_(driver) {
-  driver->setTxIns(id, ins);
+SingleHandle::SingleHandle(DxlDriver* p_driver)
+: BaseHandle(kUnitiliaized), p_driver_(p_driver) {
 }
 
-SingleHandle::~SingleHandle() {
+
+bool SingleHandle::setInstruction(uint8_t id, uint8_t ins) {
+  bool success = false;
+  if (checkState(kUnitiliaized)) {
+    success = true;
+    p_driver_->setTxIns(id, ins);
+    state_ = kInitial;
+  }
+  return success;
 }
 
 bool SingleHandle::writeByte(uint8_t value) {
   bool success = false;
-  if (state_ != kInitial) {
-    // out of sequence call, return default value false
-  } else if (p_driver_ != nullptr) {
+  if (checkState(kInitial)) {
     success = p_driver_->writeTxByte(value);
-  }
-  if (!success) {
-    state_ = kClosed;
+    if (!success) {
+      close();
+    }
   }
   return success;
 }
 
 bool SingleHandle::writeWord(uint16_t value) {
   bool success = false;
-  if (state_ != kInitial) {
-    // out of sequence call, return default value false
-  } else if (p_driver_ != nullptr) {
+  if (checkState(kInitial)) {
     success = p_driver_->writeTxWord(value);
-  }
-  if (!success) {
-    state_ = kClosed;
+    if (!success) {
+      close();
+    }
   }
   return success;
 }
@@ -173,15 +270,13 @@ bool SingleHandle::writeWord(uint16_t value) {
 bool SingleHandle::startTransmission() {
   bool started = false;
   uint8_t i;
-  if (state_ != kInitial) {
-    // out of sequence call, return default value false
-  } else if (id_ == DxlProtocolV1::kBroadcastId) {
+  if (checkState(kInitial)) {
     started = p_driver_->beginTransmission() != DxlDriver::kErrorInvalidTransmitData;
-  }
-  if (started) {
-    state_ = kInTransit;
-    } else {
-    state_ = kClosed;
+    if (started) {
+      state_ = kInTransit;
+      } else {
+      close();
+    }
   }
   return started;
 }
@@ -194,6 +289,7 @@ int SingleHandle::poll() {
     // this is an error
   } else if (state_ == kTransactionComplete) {
     // already done, no need to repeat
+    result == memoized_result_;
   } else if (state_ != kInTransit) {
   // out of sequence call, return default value
   } else {
@@ -207,69 +303,113 @@ int SingleHandle::poll() {
       result = 0;
       default:
       result = -1;
+    }    
+    if (result < 1) {
+      memoized_result_ = result;
+      state_ = kTransactionComplete;
     }
-  }    
-  if (result) {
-    state_ = kTransactionComplete;
   }
   return result;
 }
 
 uint8_t SingleHandle::getMotorId() {
-  return (p_driver_ != nullptr && state_ == kTransactionComplete) ? p_driver_->getRxId() : 0xff;
+  return (checkState(kTransactionComplete)) ? p_driver_->getRxId() : 0xff;
 }
 
 uint8_t SingleHandle::getMotorStatus() {
-  return (p_driver_ != nullptr && state_ == kTransactionComplete) ? p_driver_->getRxStatusByte() : 0xff;
+  return (checkState(kTransactionComplete)) ? p_driver_->getRxStatusByte() : 0xff;
 }
 
 uint8_t SingleHandle::readByte() {
-  return (p_driver_ != nullptr && state_ == kTransactionComplete) ? p_driver_->readRxByte() : 0xff;
+  return (checkState(kTransactionComplete)) ? p_driver_->readRxByte() : 0xff;
 }
 
 uint8_t SingleHandle::readWord() {
-  return (p_driver_ != nullptr && state_ == kTransactionComplete) ? p_driver_->readRxWord() : 0xffff;
+  return (checkState(kTransactionComplete)) ? p_driver_->readRxWord() : 0xffff;
+}
+
+void SingleHandle::close() {
+  if (p_driver_ != nullptr && state_ != kClosed) {
+    // TODO: cleanup
+  }
+  p_driver_ = nullptr;
+  state_ = kClosed;
+}
+
+bool SingleHandle::checkState(uint8_t expected_state) {
+  bool state_ok = false;
+  if (p_driver_ != nullptr && state_ == expected_state) {
+    state_ok = true;
+  } else {
+    close();
+  }
 }
 
 
 //////////////////////////////////////////////////////////////////////////
-/// BroadcastHandle
+/// BroadcasTransactiontHandle
 //////////////////////////////////////////////////////////////////////////
-BroadcastHandle::BroadcastHandle(MotorHandleFactory* p_motors, uint8_t ins) {
+BroadcastHandle::BroadcastHandle()
+: BaseHandle(kClosed)
+{}
+
+BroadcastHandle::BroadcastHandle(uint8_t number_of_handles)
+: BaseHandle(kUnitiliaized), n_handles_(number_of_handles)
+{
   int i;
-  DxlDriver driver;
-  handles_ = new SingleHandle[p_motors->n_drivers_];
-  for (i=0; i <p_motors->n_drivers_; i++) {
-    handles_[i] = {p_motors->p_drivers_[i], DxlProtocolV1::kBroadcastId, ins};
+  p_handles_ = new SingleHandle[number_of_handles];
+}
+
+
+BroadcastHandle::~BroadcastHandle() {
+  close();
+  if (p_handles_ != nullptr) {
+    delete[] p_handles_;
+    p_handles_ = nullptr;    
   }
+}
+
+bool BroadcastHandle::setInstruction(uint8_t id, uint8_t ins) {
+  int i;
+  bool success = false;
+  if (checkState(kInitial)) {
+    success = true;
+    for (i=0; i<n_handles_; i++) {
+      success = (p_handles_[i].setInstruction(id, ins)) ? success : false;
+    }
+    if (!success) {
+      close();
+    }
+  }
+  return success;
 }
 
 bool BroadcastHandle::writeByte(uint8_t value) {
   int i;
   bool success = false;
-  if (p_motor_ == nullptr) {
-    // error
-    } else if (state_ != kInitial) {
-    // error
-    } else {
+  if (checkState(kInitial)) {
     success = true;
-    for (i=0; i<p_motor_->n_drivers_; i++) {
-      success = (handles_[i].writeByte(value)) ? success : false;
+    for (i=0; i<n_handles_; i++) {
+      success = (p_handles_[i].writeByte(value)) ? success : false;
+    }
+    if (!success) {
+      close();
     }
   }
   return success;
 }
+
+
 bool BroadcastHandle::writeWord(uint16_t value) {
   int i;
   bool success = false;
-  if (p_motor_ == nullptr) {
-    // error
-    } else if (state_ != kInitial) {
-    // error
-    } else {
+  if (checkState(kInitial)) {
     success = true;
-    for (i=0; i<p_motor_->n_drivers_; i++) {
-      success = (handles_[i].writeWord(value)) ? success : false;
+    for (i=0; i<n_handles_; i++) {
+      success = (p_handles_[i].writeWord(value)) ? success : false;
+    }
+    if (!success) {
+      close();
     }
   }
   return success;
@@ -278,15 +418,18 @@ bool BroadcastHandle::writeWord(uint16_t value) {
 bool BroadcastHandle::startTransmission() {
   int i;
   bool success = false;
-  if (p_motor_ == nullptr) {
-    // error
-  } else if (state_ != kInitial) {
-    // error  
-  } else {
+  if (checkState(kInitial)) {
     success = true;
-    for (i=0; i<p_motor_->n_drivers_; i++) {
-      success = (handles_[i].startTransmission()) ? success : false;
+    for (i=0; i<n_handles_; i++) {
+      if (!p_handles_[i]) {
+        continue;
+      }
+      success = success && (p_handles_[i].startTransmission()) ? success : false;
+    }
+    if (success) {
       state_ = kInTransit;
+    } else {
+      close();
     }
   }
   return success;
@@ -294,47 +437,59 @@ bool BroadcastHandle::startTransmission() {
 
 int BroadcastHandle::poll() {
   int i;
-  int poll_status;
-  int summary_poll_status = -1;
-  if (p_motor_ == nullptr) {
-    // error
-    } else if (state_ != kInitial) {
-    // error
-    } else {
-    summary_poll_status = 0;
-    for (i=0; i<p_motor_->n_drivers_; i++) {
-      poll_status = handles_[i].poll() == 0;
-      if (poll_status > 1) {
+  int result;
+  int summary_result = -1;
+  if (p_handles_ == nullptr) {
+  // error
+  } else if (state_ != kInitial) {
+  // error
+  } else if (state_ == kTransactionComplete) {
+    // already done, no need to repeat
+    summary_result == memoized_result_;
+    // return     
+  } else {
+    summary_result = 0;
+    for (i=0; i<n_handles_; i++) {
+      if (!p_handles_[i]) {
+        continue;
+      }
+      result = p_handles_[i].poll() == 0;
+      if (result > 1) {
         // if any driver is still busy, give a busy status 
-        summary_poll_status = 1;
-      } else if (poll_status < 0) {
+        summary_result = 1;
+      } else if (result < 0) {
         // if no driver busy, but driver has error, return error
-        summary_poll_status = -1;
+        summary_result = -1;
       }
     }
-    if (summary_poll_status < 1) {
+    if (summary_result < 1) {
+      memoized_result_ = summary_result;
       state_ = kTransactionComplete;
+    }    
+  }
+  return summary_result;
+}
+
+void BroadcastHandle::close() {
+  int i;
+  if (state_ != kClosed) {
+    for (i=0; i<n_handles_; i++) {
+      p_handles_[i].close();
     }
   }
-  return summary_poll_status;
+  state_ = kClosed;
 }
 
-uint8_t BroadcastHandle::getMotorId() {
-  return 0xff;
-}
-uint8_t BroadcastHandle::getMotorStatus() {
-  return 0xff;
-}
-uint8_t BroadcastHandle::readByte() {
-  return 0xff;
-}
-uint8_t BroadcastHandle::readWord() {
-  return 0xffff;
+bool BroadcastHandle::checkState(uint8_t expected_state) {
+  bool state_ok = false;
+  if (p_handles_ != nullptr && state_ == expected_state) {
+    state_ok = true;
+  } else {
+    close();
+  }
+  return state_ok;
 }
 
-BroadcastHandle::~BroadcastHandle() {
-  delete[] handles_;
-}
 
 //////////////////////////////////////////////////////////////////////////
 /// GenericHandle
@@ -344,12 +499,14 @@ GenericHandle::GenericHandle(MotorHandleFactory* p_motors, uint8_t id, uint8_t i
 {
   if (id_ == DxlProtocolV1::kBroadcastId) {
     if (p_motors->aquireLockAll()) {
-      handle_ = new BroadcastHandle{p_motors_, ins};
+      handle_ = new BroadcastHandle{p_motors_->countDrivers()};
+      handle_->setInstruction(id, ins);
       p_motors_ = p_motors;
     }          
   } else {
     if (p_motors->aquireLock(p_motors->getDriverIndex(id))) {
-      handle_ = new SingleHandle{p_motors, p_motors->getDxlDriver(), id, ins};
+      handle_ = new SingleHandle{p_motors->getDriverPtr(id)};
+      handle_->setInstruction(id, ins);
     }
   }
 }
@@ -358,91 +515,102 @@ GenericHandle::~GenericHandle() {
   close();
   if (handle_ != nullptr) {
     delete handle_;
+    handle_ = nullptr;
   }
+}
+
+bool GenericHandle::setInstruction(uint8_t id, uint8_t ins) {
+  return (p_motors_ != nullptr && handle_ != nullptr) ? handle_->setInstruction(id, ins) : false;
 }
 
 bool GenericHandle::writeByte(uint8_t value) {
-  return (p_motors_ != nullptr && handle_ != nullptr) handle_->writeByte(value) : false;
+  return (p_motors_ != nullptr && handle_ != nullptr) ? handle_->writeByte(value) : false;
 }
 
 bool GenericHandle::writeWord(uint16_t value) {
-  return (p_motors_ != nullptr && handle_ != nullptr) handle_->writeWord(value) : false;
+  return (p_motors_ != nullptr && handle_ != nullptr) ? handle_->writeWord(value) : false;
 }
 
 bool GenericHandle::startTransmission() {
-  return (p_motors_ != nullptr && handle_ != nullptr) handle_->startTransmission() : false;
+  return (p_motors_ != nullptr && handle_ != nullptr) ? handle_->startTransmission() : false;
 }
 
-bool GenericHandle::poll() {
-  return (p_motors_ != nullptr && handle_ != nullptr) handle_->poll() : false;
+int GenericHandle::poll() {
+  return (p_motors_ != nullptr && handle_ != nullptr) ? handle_->poll() : -1;
 }
 
 uint8_t GenericHandle::getMotorId() {
-  return (p_motors_ != nullptr && handle_ != nullptr) handle_->getMotorId() : 0xff;
+  return (p_motors_ != nullptr && handle_ != nullptr) ? handle_->getMotorId() : 0xff;
 }
 
 uint8_t GenericHandle::getMotorStatus() {
-  return (p_motors_ != nullptr && handle_ != nullptr) handle_->getMotorStatus() : 0x80;
+  return (p_motors_ != nullptr && handle_ != nullptr) ? handle_->getMotorStatus() : 0xff;
 }
 
 uint8_t GenericHandle::readByte() {
-  return (p_motors_ != nullptr && handle_ != nullptr) handle_->readByte() : 0xff;
+  return (p_motors_ != nullptr && handle_ != nullptr) ? handle_->readByte() : 0xff;
 }
 
 uint8_t GenericHandle::readWord() {
-  return (p_motors_ != nullptr && handle_ != nullptr) handle_->readWord() : 0xffff;
+  return (p_motors_ != nullptr && handle_ != nullptr) ? handle_->readWord() : 0xffff;
 }
 
-bool GenericHandle::close() {
-  if (id_ == DxlProtocolV1::kBroadcastId) {
-    
-    if (p_motors_ != nullptr) {
-      // TODO: some cleanup
-      p_motors_->releaseLockAll();    
-    }
-  } else {
-    if (p_motors_ != nullptr) {
-      // TODO: some cleanup
-      p_motors_->releaseLock(p_motors_->getDriverIndex(id_));
-    }
+void GenericHandle::close() {
+  if (handle_ != nullptr) {
+    handle_->close();
   }
+  if (p_motors_ != nullptr) {
+    if (id_ == DxlProtocolV1::kBroadcastId) {
+        p_motors_->releaseLockAll();
+    } else {
+        p_motors_->releaseLock(p_motors_->getDriverIndex(id_));
+    }
+  }  
   p_motors_ = nullptr;
-  state_ = kClosed;
 }
+
 
 //////////////////////////////////////////////////////////////////////////
 /// SyncWriteHandle
 //////////////////////////////////////////////////////////////////////////
 SyncWriteHandle::SyncWriteHandle(MotorHandleFactory* p_motor_driver, uint8_t target_register, uint8_t n_bytes) 
-: state_(kInitial), target_register_(target_register), n_bytes_(n_bytes), p_motors_(p_motor_driver) { }
+: BroadcastHandle(p_motors_->countDrivers()), target_register_(target_register), n_bytes_(n_bytes) {
+  if(p_motors_->aquireLockAll()) {
+    p_motors_ = p_motor_driver;
+  }
+}
 
 SyncWriteHandle::~SyncWriteHandle() {
   close();
+  if (p_handles_ != nullptr) {
+    delete[] p_handles_;
+    p_handles_ = nullptr;
+  }
 }
 
 bool SyncWriteHandle::toMotor(uint8_t id) {
   bool success = false;
-  uint8_t driver_idx = 0xff;
+  DxlDriver* driver = nullptr;
+  uint8_t driver_idx;
+  SingleHandle* handle;
   if (state_ != kInitial) {
     // out of sequence call
+  } else if (current_handle_ != nullptr) {
+    // mismatched number of bytes
   } else if (p_motors_ != nullptr) {
+    driver = p_motors_->getDriverPtr(id);
     driver_idx = p_motors_->getDriverIndex(id);
   }
-  
-  if (id >= MotorHandleFactory::kMaxMotors ) {
-    // not a valid id!
-  } else if (written_ != 0 && written_ != n_bytes_) {
-    // incorrectly written length! 
-  } else if (driver_idx < p_motors_->n_drivers_) {
-    p_current_dxl_ = p_motors_->p_drivers_[driver_idx];
-    if (!initialized_[driver_idx]) {
-      // not yet initialize this particular driver;
-      p_current_dxl_->setTxIns(DxlProtocolV1::Ins::kBroadcastId, DxlProtocolV1::Ins::kSyncWrite);
-      p_current_dxl_->writeTxByte(target_register_);
-      p_current_dxl_->writeTxByte(n_bytes_);
-      initialized_[driver_idx] = true;    
+  if (driver != nullptr) {
+    if (!p_handles_[driver_idx]) {
+      // handle for this driver has not been created, try to create a new handle
+      p_handles_[driver_idx] = SingleHandle{driver};
     }
-    success = p_current_dxl_->writeTxByte(id);
+    current_handle_ = &p_handles_[driver_idx];
+    current_handle_->setInstruction(DxlProtocolV1::Ins::kBroadcastId, DxlProtocolV1::Ins::kSyncWrite);
+    current_handle_->writeByte(target_register_);
+    current_handle_->writeByte(n_bytes_);
+    success = true;
     written_ = 0;
   }
   if (!success) {
@@ -455,10 +623,14 @@ bool SyncWriteHandle::writeByte(uint8_t value) {
   bool success = false;
   if (state_ != kInitial) {
     // out of sequence call, return default value false
-  } else if (p_current_dxl_ == nullptr) {
+  } else if (current_handle_ == nullptr) {
     // invalid
   } else if (written_ < n_bytes_) {
-    success = p_current_dxl_->writeTxByte(value);
+    success = current_handle_->writeByte(value);
+    written_ += 1;
+    if (written_ == n_bytes_) {  // completed write for this motor
+      current_handle_ = nullptr;
+    }
   }
   if (!success) {
     close();
@@ -470,10 +642,14 @@ bool SyncWriteHandle::writeWord(uint16_t value) {
   bool success = false;
   if (state_ != kInitial) {
   // out of sequence call, return default value false
-  } else if (p_current_dxl_ == nullptr) {
+  } else if (current_handle_ == nullptr) {
   // invalid
   } else if (written_ < n_bytes_ && (written_ + 1) < n_bytes_) {
-    success = p_current_dxl_->writeTxWord(value);
+    success = current_handle_->writeWord(value);
+    written_ += 2;
+    if (written_ == n_bytes_) {  // completed write for this motor
+      current_handle_ = nullptr;
+    }
   }
   if (!success) {
     close();
@@ -481,212 +657,14 @@ bool SyncWriteHandle::writeWord(uint16_t value) {
   return success;
 }
 
-bool SyncWriteHandle::startTransmission() {
-  bool started = false;
-  uint8_t i;
-  if (state_ != kInitial) {
-    // out of sequence call, return default value false
-  } else if (p_current_dxl_ == nullptr) {
-    // invalid
-  }else if (written_ != n_bytes_) {
-    // something incomplete
-  } else {
-    p_current_dxl_ = nullptr;
-    for (i=(uint8_t)0; i<p_motors_->n_drivers_; i++) {
-      if (initialized_[i]) {
-        started = started && p_motors_->p_drivers_[i]->beginTransmission() != DxlDriver::kErrorInvalidTransmitData;
-      }
-    }  
-  }
-  if (started) {
-    state_ = kInTransit;
-  } else {
-    close();
-  }
-  return started;
-}
-
-bool SyncWriteHandle::poll() {
-  DxlDriver::Status status;
-  uint8_t i;
-  bool is_done;
-  if (state_ == kTransactionComplete) {
-    is_done = true;
-  } else if (state_ != kInTransit) {
-    is_done = false;
-    // out of sequence call, return default value false
-  } else {
-    is_done = true;
-    for (i=(uint8_t)0; i<p_motors_->n_drivers_; i++) {
-      if (initialized_[i]) {
-        // sync-write has no reply, timeout is the expected result
-        status = p_motors_->p_drivers_[i]->poll();
-        switch(status) {
-          case DxlDriver::kTransmitting:
-          case DxlDriver::kReceiving:
-            is_done = false;  // not done yet if any of the drivers and still sending/receiving
-            break;
-          default:
-            break;
-        }
-      }
-    }
-  }
-
-  if (is_done) {
-    state_ = kTransactionComplete;
-  }  
-  return is_done;
-}
-
-bool SyncWriteHandle::close() {
+void SyncWriteHandle::close() {
+  BroadcastHandle::close();
   if (p_motors_ != nullptr) {
-    if (state_ != kTransactionComplete) {
-      // TODO: some cleanup should be done.
-    }
-    p_motors_->driver_lock_ = false;
+      p_motors_->releaseLockAll();
   }
-  p_current_dxl_ = nullptr;
-  p_motors_ = nullptr;
-  state_ = kClosed;
 }
 
 
 
-
-
-FeedbackHandle::FeedbackHandle(MotorHandleFactory* p_motor_driver) 
-: combined_state_(kInitial), 
-p_motors_(p_motor_driver),
-{
-  uint8_t id,;
-  
-  // initialize memory
-  for (id=0; id<MotorHandleFactory::kMaxMotors; id++) {
-    driver = p_motors_->p_id_mappings_[id];
-    p_motors_->p_feedbacks_[id] = MotorFeedbackData{};
-  }
-  memset(p_driver_states_, kInitial, sizeof(decltype(*p_driver_states_) * MotorHandleFactory::kMaxDrivers));
-  memset(p_reqeust_id_, 0xff, sizeof(decltype(*p_reqeust_id_) * MotorHandleFactory::kMaxDrivers));
-  memset(p_retries_)
-}
-
-FeedbackHandle::~FeedbackHandle() {
-  close();
-}
-
-bool FeedbackHandle::readAllMotors() {
-  bool is_done = false;
-  DxlDriver* driver;
-  uint8_t i, motor_id;
-  uint8_t driver_idx;
-  bool loop_done;
-  
-  // Some temporary data
-  uint8_t p_request_id_[MotorHandleFactory::kMaxDrivers];
-  uint8_t p_retries_[MotorHandleFactory::kMaxMotors];
-
-  for (driver_idx=0; driver_idx<MotorHandleFactory::kMaxDrivers; driver_idx++) {
-    p_request_id_[driver_idx] = 0xff;
-    p_driver_states_[driver_idx] = kInitial;
-  }
-  if (p_motors_ == nullptr) {
-    // invalid handle
-  } else if (combined_state_ != kInitial) {
-    // out of sequence call, return default value false
-  } else {
-    for (motor_id=0; motor_id<MotorHandleFactory::kMaxMotors; motor_id++) {
-      /// clear the feedback data
-      p_motors_->p_feedbacks_[motor_id] = MotorFeedbackData{};
-    }
-    while (1) {
-      loop_done = true;
-      /// Trigger request for each Motor
-      for (motor_id=0; motor_id<MotorHandleFactory::kMaxMotors; motor_id++) {
-        if (p_retries_[motor_id] >= kMaxRetry) {
-          continue;  // already obtained valid data, do nothing
-        } 
-        driver_idx = p_motors_->getDriverIndex(motor_id);
-        loop_done = false; // getting here means there are unread motors
-        if (p_driver_states_[driver_idx] == kInTransit) {
-          continue;  // driver is busy, try again later
-        }
-        /// Begin read request
-        driver = p_motors_->p_drivers_[driver_idx];
-        driver->setTxIns(motor_id, DxlProtocolV1::Ins::kRead);
-        driver->writeTxByte(kFirstReg);
-        driver->writeTxByte(kByteSize);
-        driver->beginTransmission();
-        p_driver_states_[driver_idx] = kInTransit;
-        p_request_id_[driver_idx] = motor_id;
-        p_retries_[motor_id]++;
-      }
-      /// Poll each driver
-      for (driver_idx=0; driver_idx<p_motors_->n_drivers_; driver_idx++) {
-        if (p_driver_states_[driver_idx] != kInTransit) {
-          continue;  // not in transit, no need to poll
-        }
-        loop_done = false; // getting here means there are busy drivers
-        driver = p_motors_->p_drivers_[driver_idx];
-        auto driver_state = driver->poll();
-        switch(driver_state) {
-          case DxlDriver::Status::kDone:
-            p_driver_states_[driver_idx] = kInitial;
-            motor_id = driver->getRxId();
-            if (motor_id != p_request_id_[driver_idx]) {
-              break;  // some error on the reply data!
-            }
-            p_motors_->p_feedbacks_[motor_id].status = driver->getRxStatusByte();
-            p_motors_->p_feedbacks_[motor_id].position = driver->readRxWord();
-            p_motors_->p_feedbacks_[motor_id].speed = driver->readRxWord();
-            p_motors_->p_feedbacks_[motor_id].torque = driver->readRxWord();
-            p_motors_->p_feedbacks_[motor_id].valid = true;
-            break;
-          case DxlDriver::Status::kErrorInvalidReceiveData:
-          case DxlDriver::Status::kErrorInvalidTransmitData:
-          case DxlDriver::Status::kErrorTimeout:
-            p_driver_states_[driver_idx] = kInitial;
-            p_motors_->p_feedbacks_[p_request_id_[driver_idx]].status = 0x80;
-            p_motors_->p_feedbacks_[motor_id].valid = true;
-            break;
-          default: {}
-        }
-      }
-      if (loop_done) {
-        break;  // break out of the for loop
-      }
-    }
-    combined_state_ = kTransactionComplete;
-  }
-  return is_done;
-}
-MotorFeedbackData FeedbackHandle::getFeedback(uint8_t id) {
-  MotorFeedbackData feedback{};  // return empty data by default
-  if (p_motors_ == nullptr) {
-    // invalid handle
-  } else if (combined_state_ != kTransactionComplete) {
-    // out of sequence call
-  } else if (id >= MotorHandleFactory::kMaxMotors) {
-    // invalid id
-  } else {  
-    feedback = p_motors_->p_feedbacks_[id];
-  }
-  return feedback;
-}
-
-bool FeedbackHandle::close() {
-  uint8_t i;
-  if (p_motors_ != nullptr) {
-    for (i=(uint8_t)0; i<MotorHandleFactory::kMaxDrivers; i++) {
-      if (p_driver_states_[i] == kInTransit) {
-        // TODO: some cleanup should be done.
-      }
-    }
-    p_motors_->driver_lock_ = false;  
-  }
-  p_motors_ = nullptr;
-  combined_state_ = kClosed;
-}
-  
 
 }  // namespace motor_handles

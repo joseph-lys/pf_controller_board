@@ -302,6 +302,12 @@
     <Compile Include="app\src\configuration.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="app\src\feedback_data.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="app\src\feedback_data.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="app\src\motor_driver.cpp">
       <SubType>compile</SubType>
     </Compile>

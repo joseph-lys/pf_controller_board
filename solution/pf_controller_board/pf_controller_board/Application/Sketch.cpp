@@ -96,12 +96,13 @@ void loop() {
   dxl0.writeTxByte(kByteSize);
   dxl0.beginTransmission();
   start_time = micros();
-  auto handle = Motors.createFeedbackHandle();
-  handle.readAllMotors();
-  auto feedback = handle.getFeedback(1);
-  if (feedback.valid)
-  logData(int status, micros() - start_time);
-  SerialUSB.println(handle.getFeedback(1).speed);
-  handle.close();
+  FeedbackDataArray datas;
+  Motors.readAllMotors(datas);
+  auto feedback = datas[1];
+  if (feedback.is_valid)
+    logData(1, micros() - start_time);
+  else 
+    logData(-1, micros() - start_time);
+  SerialUSB.println(datas[1].present_speed);
   delay(1000);
 }
