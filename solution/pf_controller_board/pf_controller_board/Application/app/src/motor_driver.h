@@ -77,9 +77,12 @@ class MotorHandleFactory {
   inline uint8_t getDriverIndex(uint8_t id) {
     return (id < kMaxDrivers) ? p_id_mappings_[id] : 0xff;
   }
-  inline DxlDriver* getDriverPtr(uint8_t id) {
+  inline DxlDriver* getDriverPtrById(uint8_t id) {
     uint8_t idx = getDriverIndex(id);
     return (idx < n_drivers_) ? p_drivers_[idx] : nullptr;
+  }
+  inline DxlDriver** getDriverPtrArray() {
+    return p_drivers_;
   }
   inline bool aquireLock(uint8_t driver_index) {
     bool lock_success = false;
@@ -93,13 +96,11 @@ class MotorHandleFactory {
   }
   inline bool aquireLockAll() {
     int i;
-    bool lock_success = false;
+    bool lock_success = true;
     for (i=0; i<n_drivers_; i++) {
       if (driver_lock_[i]) {
         lock_success=false;
         break;
-        } else {
-        lock_success = true;
       }
     }
     if (lock_success) {
@@ -132,9 +133,10 @@ class MotorHandleFactory {
   /// Mapping Queue takes existing motor mapping to make a set of queues
   class MappingQueue {
    public:
-    void build(uint8_t* mapping);
-    uint8_t pop(uint8_t index);
-    bool hasItem(uint8_t index);
+    void build(uint8_t* mapping); // build the queue using an array motor mappings
+    uint8_t pop(uint8_t index);  // remove one
+    bool hasItem(uint8_t index);  // peek to see if there is any
+    void rewind();  // resets the queue to the state after build()
    private:
     uint8_t motor_ids_[kMaxMotors];
     uint8_t start_[kMaxDrivers];
@@ -193,8 +195,10 @@ class BaseHandle {
   virtual uint8_t readByte() { return 0xff; }
   virtual uint8_t readWord() { return 0xffff; }
   virtual void close() {}
+  virtual uint8_t getState() { return state_; }
  protected:
   uint8_t state_ = 0;
+  inline void setState(uint8_t next_state) { state_ = next_state; }
 };
 
 class SingleHandle : public BaseHandle {
@@ -225,7 +229,7 @@ class SingleHandle : public BaseHandle {
 class BroadcastHandle : public BaseHandle{
  public:
   BroadcastHandle();
-  BroadcastHandle(uint8_t n_handles);
+  BroadcastHandle(uint8_t n_drivers, DxlDriver** p_drivers=nullptr);
   ~BroadcastHandle();
   operator bool() const { return p_handles_ != nullptr; }
   bool setInstruction(uint8_t id, uint8_t ins) override;
@@ -236,6 +240,7 @@ class BroadcastHandle : public BaseHandle{
   /// @returns 0: done, 1: not complete, -1 any error
   int poll() override;
   void close() override;
+  uint8_t getState() override;
  protected:
   SingleHandle* p_handles_ = nullptr;
   const uint8_t n_handles_ = 0; 

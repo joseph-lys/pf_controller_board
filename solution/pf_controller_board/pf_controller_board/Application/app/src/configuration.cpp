@@ -131,5 +131,5 @@ void initAppComponents() {
   // Initialized the motor interface
   Motors.addDriver(dxl0);
   Motors.addDriver(dxl1);
-  // Motors.init();
+  Motors.init();
 };

@@ -13,12 +13,20 @@
 #define LED_PIN 13
 
 
+static constexpr uint8_t motor_id = 1;
+static constexpr uint8_t broadcast_id = 0xfe;
+static constexpr uint8_t reg_return_delay_time = 5;
+static constexpr uint8_t reg_led = 25;
 
 void setup() {
   // put your setup code here, to run once:
   delay(3000);
   initAppComponents();
   SerialUSB.begin(0);
+  delay(100);
+  // auto handle = Motors.createWriteHandle(motor_id, reg_return_delay_time);
+  // handle.writeByte(5);
+  
 }
 
 enum Constants : uint8_t {
@@ -96,13 +104,42 @@ void loop() {
   dxl0.writeTxByte(kByteSize);
   dxl0.beginTransmission();
   start_time = micros();
-  FeedbackDataArray datas;
-  Motors.readAllMotors(datas);
-  auto feedback = datas[1];
-  if (feedback.is_valid)
-    logData(1, micros() - start_time);
-  else 
-    logData(-1, micros() - start_time);
-  SerialUSB.println(datas[1].present_speed);
+  // FeedbackDataArray datas;
+  // Motors.readAllMotors(datas);
+  // auto feedback = datas[1];
+  // if (feedback.is_valid)
+  //   logData(1, micros() - start_time);
+  // else 
+  //   logData(-1, micros() - start_time);
+  // SerialUSB.println(datas[1].present_speed);
+  
+  auto single_handle = Motors.createWriteHandle(motor_id);
+  single_handle.writeByte(reg_led);
+  single_handle.writeByte(1);
+  single_handle.startTransmission();
+  while (single_handle.poll() > 0) { }
+  delay(1000);
+  
+  single_handle.writeByte(reg_led);
+  single_handle.writeByte(0);
+  single_handle.startTransmission();
+  while (single_handle.poll() > 0) { }
+  delay(1000);
+    
+  single_handle.close();
+  
+  auto broadcast_handle = Motors.createWriteHandle(broadcast_id);
+  broadcast_handle.writeByte(reg_led);
+  broadcast_handle.writeByte(1);
+  broadcast_handle.startTransmission();
+  while (broadcast_handle.poll() > 0) { }
+  
+  delay(1000);
+  broadcast_handle.writeByte(reg_led);
+  broadcast_handle.writeByte(0);
+  broadcast_handle.startTransmission();
+  while (broadcast_handle.poll() > 0) { }
+  
+  broadcast_handle.close();
   delay(1000);
 }
