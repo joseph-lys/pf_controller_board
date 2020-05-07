@@ -101,13 +101,13 @@ void SpiEnd_Handler (void) {
 void initAppComponents() {
   
   // Pin configuration
-  pinMode(kPinRxUart0, INPUT_PULLUP);
+  pinMode(kPinRxUart0, INPUT);
   pinPeripheral(kPinRxUart0, PIO_SERCOM);
   pinMode(kPinTxUart0, OUTPUT);
   pinPeripheral(kPinTxUart0, PIO_SERCOM);
   pinMode(kPinDirUart0, OUTPUT);
   
-  pinMode(kPinRxUart1, INPUT_PULLUP);
+  pinMode(kPinRxUart1, INPUT);
   pinPeripheral(kPinRxUart1, PIO_SERCOM);
   pinMode(kPinTxUart1, OUTPUT);
   pinPeripheral(kPinTxUart1, PIO_SERCOM_ALT);

@@ -118,13 +118,13 @@ void loop() {
   single_handle.writeByte(1);
   single_handle.startTransmission();
   while (single_handle.poll() > 0) { }
-  delay(1000);
+  delay(500);
   
   single_handle.writeByte(reg_led);
   single_handle.writeByte(0);
   single_handle.startTransmission();
   while (single_handle.poll() > 0) { }
-  delay(1000);
+  delay(500);
     
   single_handle.close();
   
@@ -134,12 +134,12 @@ void loop() {
   broadcast_handle.startTransmission();
   while (broadcast_handle.poll() > 0) { }
   
-  delay(1000);
+  delay(500);
   broadcast_handle.writeByte(reg_led);
   broadcast_handle.writeByte(0);
   broadcast_handle.startTransmission();
   while (broadcast_handle.poll() > 0) { }
   
   broadcast_handle.close();
-  delay(1000);
+  delay(500);
 }
