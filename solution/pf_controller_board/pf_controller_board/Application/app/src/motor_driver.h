@@ -75,7 +75,7 @@ class MotorHandleFactory {
   uint8_t countDrivers();
   
   inline uint8_t getDriverIndex(uint8_t id) {
-    return (id < kMaxDrivers) ? p_id_mappings_[id] : 0xff;
+    return (id < kMaxMotors) ? p_id_mappings_[id] : 0xff;
   }
   inline DxlDriver* getDriverPtrById(uint8_t id) {
     uint8_t idx = getDriverIndex(id);

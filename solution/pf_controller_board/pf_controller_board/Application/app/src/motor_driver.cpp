@@ -52,12 +52,11 @@ void MotorHandleFactory::init() {
   uint8_t i, id;
   for (i= 0; i<3; i++) {  // multiple tries to avoid missing motors
     for (id=0u; id<kMaxMotors; id++) {
-      if(pingMotor(id)) {
-        break;
-      }
+      pingMotor(id);
     }
   }
 }
+
 
 bool MotorHandleFactory::pingMotor(uint8_t id) {
   bool is_found = false;
@@ -118,7 +117,7 @@ void MotorHandleFactory::MappingQueue::build(uint8_t* mapping) {
     end_[i] = start_[i];
     for(j=0; j<kMaxMotors; j++) {
       if (i==mapping[j]) {
-        motor_ids_[end_[i]] = mapping[j];
+        motor_ids_[end_[i]] = j;
         end_[i]++;
       }
     }
@@ -152,7 +151,7 @@ bool MotorHandleFactory::readAllMotors(MotorDataInterface& datas) {
     return false;
   }
   DxlDriver* driver;
-  uint8_t i, motor_id;
+  uint8_t i;
   uint8_t driver_idx;
   uint8_t reg = datas.requestedRegister();
   uint8_t len = datas.requestedLength();
@@ -163,7 +162,7 @@ bool MotorHandleFactory::readAllMotors(MotorDataInterface& datas) {
   /// Data initialization
   for (driver_idx=0; driver_idx<MotorHandleFactory::kMaxDrivers; driver_idx++) {
     p_request_id_[driver_idx] = 0xff;
-    p_retries_[motor_id] = max_retries;
+    p_retries_[driver_idx] = max_retries;
   }
   datas.initializeDatas();
   queue_.build(p_id_mappings_);
@@ -177,17 +176,16 @@ bool MotorHandleFactory::readAllMotors(MotorDataInterface& datas) {
       }
       if(p_retries_[driver_idx] >= max_retries && queue_.hasItem(driver_idx)) {
         p_request_id_[driver_idx] = queue_.pop(driver_idx);
-        p_retries_[motor_id] = 0;
+        p_retries_[driver_idx] = 0;
       }
       if (p_retries_[driver_idx] < max_retries) {
-        driver = getDriverPtrById(motor_id);
+        driver = getDriverPtrById(p_request_id_[driver_idx]);
         p_handles_[driver_idx] = motor_handles::SingleHandle(driver);
-        p_handles_[driver_idx].setInstruction(motor_id, DxlProtocolV1::Ins::kRead);
+        p_handles_[driver_idx].setInstruction(p_request_id_[driver_idx], DxlProtocolV1::Ins::kRead);
         p_handles_[driver_idx].writeByte(reg);
         p_handles_[driver_idx].writeByte(len);
         p_handles_[driver_idx].startTransmission();
-        p_request_id_[driver_idx] = motor_id;
-        p_retries_[motor_id]++;
+        p_retries_[driver_idx]++;
           
         loop_done = false;
       }
@@ -200,15 +198,14 @@ bool MotorHandleFactory::readAllMotors(MotorDataInterface& datas) {
       if (result > 0) {  // still busy, skip
         loop_done = false;
         continue;
-      }
-      if (result == 0) {  // successful reply
+      } else if (result == 0) {  // successful reply
         if (p_request_id_[driver_idx] == p_handles_[driver_idx].getMotorId()) {
           datas.replyFromHandle(p_handles_[driver_idx], p_request_id_[driver_idx]);
           p_retries_[driver_idx] = max_retries;
-          } else {  // mismatch is an error
+        } else {  // mismatch is an error
           datas.errorFromHandle(p_request_id_[driver_idx]);
         }
-        } else if (result < 0) {  // all other errors
+      } else {  // all other errors
         datas.errorFromHandle(p_request_id_[driver_idx]);
       }
       p_handles_[driver_idx] = motor_handles::SingleHandle{};  // set to empty handle after processed
@@ -318,6 +315,7 @@ int SingleHandle::poll() {
       break;
       case DxlDriver::kDone:
       result = 0;
+      break;
       default:
       result = -1;
     }    
