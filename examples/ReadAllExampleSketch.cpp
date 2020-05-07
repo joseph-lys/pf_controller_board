@@ -18,7 +18,6 @@ static constexpr uint8_t motor_ids[] = {1, 19};
 static constexpr uint8_t broadcast_id = 0xfe;
 static constexpr uint8_t reg_led = 25;
 static constexpr uint8_t reg_return_delay_time = 5;
-static constexpr uint8_t number_of_bytes = 1;
 
 static FeedbackDataArray feedback_datas{};
 
@@ -32,23 +31,27 @@ void setup() {
 
 void loop() {
   uint8_t i, id;
-  auto handle = Motors.createSyncWriteHandle(reg_led, number_of_bytes);
-  
-  for (i=0; i<sizeof(motor_ids); i++) {
-    handle.toMotor(motor_ids[i]);
-    handle.writeByte(i % 2);    
+  Motors.readAllMotors(feedback_datas);
+  for (i=0; i < sizeof(motor_ids); i++) {
+    id = motor_ids[i];
+    auto data = feedback_datas[id];
+    SerialUSB.print("id: ");
+    SerialUSB.print(static_cast<unsigned int>(id));
+    if (data.is_valid) {
+      SerialUSB.print(", status:");
+      SerialUSB.print(static_cast<unsigned int>(data.status), HEX);
+      SerialUSB.print(", pos:");
+      SerialUSB.print(data.present_position);
+      SerialUSB.print(", spd:");
+      SerialUSB.print(data.present_speed);
+      SerialUSB.print(", load:");
+      SerialUSB.print(data.present_load);
+      SerialUSB.println();
+    } else {
+      SerialUSB.print(", NOT FOUND");
+      SerialUSB.println();
+    }      
   }
-  handle.startTransmission();
-  while(handle.poll() > 0) { }
-  
-  delay(500);
-  
-  for (i=0; i<sizeof(motor_ids); i++) {
-    handle.toMotor(motor_ids[i]);
-    handle.writeByte((i + 1) % 2);    
-  }
-  handle.startTransmission();
-  while(handle.poll() > 0) { }
-    
-  delay(500);
+
+  delay(1000);
 }

@@ -14,6 +14,7 @@
 
 
 #include "motor_driver.h"
+#include "feedback_data.h"
 #include "dma_uart.h"
 #include "dma_spi.h"
 
