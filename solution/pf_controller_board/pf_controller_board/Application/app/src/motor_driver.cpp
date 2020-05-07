@@ -668,8 +668,8 @@ bool SyncWriteHandle::toMotor(uint8_t id) {
   DxlDriver* driver = nullptr;
   uint8_t driver_idx;
   SingleHandle* handle;
-  if (state_ != kInitial) {
-    // out of sequence call
+  if (p_motors_ == nullptr) {
+    // bad handle
   } else if (current_handle_ != nullptr) {
     // mismatched number of bytes
   } else if (p_motors_ != nullptr) {
@@ -680,15 +680,20 @@ bool SyncWriteHandle::toMotor(uint8_t id) {
     if (!p_handles_[driver_idx]) {
       // handle for this driver has not been created, try to create a new handle
       p_handles_[driver_idx] = SingleHandle{driver};
+      p_handles_[driver_idx].setInstruction(DxlProtocolV1::Ins::kBroadcastId, DxlProtocolV1::Ins::kSyncWrite);
+    } else if (p_handles_[driver_idx].getState() == kTransactionComplete) {
+      p_handles_[driver_idx].setInstruction(DxlProtocolV1::Ins::kBroadcastId, DxlProtocolV1::Ins::kSyncWrite);
     }
     current_handle_ = &p_handles_[driver_idx];
-    current_handle_->setInstruction(DxlProtocolV1::Ins::kBroadcastId, DxlProtocolV1::Ins::kSyncWrite);
     current_handle_->writeByte(target_register_);
     current_handle_->writeByte(n_bytes_);
+    current_handle_->writeByte(id);
     success = true;
     written_ = 0;
   }
-  if (!success) {
+  if (success) {
+    setState(kInitial);
+  } else {
     close();
   }
   return success;
