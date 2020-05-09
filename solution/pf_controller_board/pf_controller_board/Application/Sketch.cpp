@@ -1,10 +1,7 @@
 ﻿/*Begining of Auto generated code by Atmel studio */
 #include <Arduino.h>
-#include "wiring_private.h"
-#include "dma_common.h"
-// #include "dma_spi.h"
-#include "configuration.h"
-#include "DxlProtocolV1.h"
+#include "pf_board.h"
+#include "feedback_data.h"
 /*End of auto generated code by Atmel studio */
 
 //Beginning of Auto generated function prototypes by Atmel Studio
@@ -13,42 +10,52 @@
 #define LED_PIN 13
 
 
+static FeedbackDataArray feedback_datas{};
 static constexpr uint8_t motor_ids[] = {1, 19};
-  
 static constexpr uint8_t broadcast_id = 0xfe;
 static constexpr uint8_t reg_led = 25;
 static constexpr uint8_t reg_return_delay_time = 5;
 static constexpr uint8_t number_of_bytes = 1;
 
-static FeedbackDataArray feedback_datas{};
 
+
+uint8_t big_buffer[64];
 void setup() {
   // put your setup code here, to run once:
   delay(3000);
   initAppComponents();
   SerialUSB.begin(0);
   delay(100);  
+  for (uint8_t i=0; i<8; i++) {
+    big_buffer[i] = 0;
+  }
+  volatile unsigned long x = micros();
+  DmaSPI.doBeforeSpiStarts();
+  x = micros() - x;
+  if (x) {
+    
+  }
 }
 
 void loop() {
-  uint8_t i, id;
-  auto handle = Motors.createSyncWriteHandle(reg_led, number_of_bytes);
-  
-  for (i=0; i<sizeof(motor_ids); i++) {
-    handle.toMotor(motor_ids[i]);
-    handle.writeByte(i % 2);    
-  }
-  handle.startTransmission();
-  while(handle.poll() > 0) { }
+  uint8_t* p_tx;
+  uint8_t* p_rx;
+  delay(100);
+  for (int i=0; i<1; i++) {
+
+  }  
+  auto broadcast_handle = Motors.createWriteHandle(broadcast_id);
+  broadcast_handle.writeByte(reg_led);
+  broadcast_handle.writeByte(1);
+  broadcast_handle.startTransmission();
+  while (broadcast_handle.poll() > 0) { }
   
   delay(500);
+  broadcast_handle.writeByte(reg_led);
+  broadcast_handle.writeByte(0);
+  broadcast_handle.startTransmission();
+  while (broadcast_handle.poll() > 0) { }
   
-  for (i=0; i<sizeof(motor_ids); i++) {
-    handle.toMotor(motor_ids[i]);
-    handle.writeByte((i + 1) % 2);    
-  }
-  handle.startTransmission();
-  while(handle.poll() > 0) { }
-    
+  broadcast_handle.close();
   delay(500);
 }

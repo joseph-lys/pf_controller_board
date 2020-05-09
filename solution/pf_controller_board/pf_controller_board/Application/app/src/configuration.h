@@ -12,20 +12,12 @@
 #ifndef CONFIGURATION_H_
 #define CONFIGURATION_H_
 
-
+#include "DxlDriver.h"
 #include "motor_driver.h"
-#include "feedback_data.h"
 #include "dma_uart.h"
 #include "dma_spi.h"
 
-extern DmaUart dma_uart0;
-extern DmaUart dma_uart1;
-extern DxlDriver dxl0;
-extern DxlDriver dxl1;
-extern DmaSpiSlave DSPI;
-extern MotorHandleFactory Motors;
 // Application specific initialization
-extern void initAppComponents();
-extern void SpiEnd_Handler();
+void initAppComponents();
 
 #endif /* CONFIGURATION_H_ */
