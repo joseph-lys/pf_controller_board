@@ -40,22 +40,28 @@ void setup() {
 void loop() {
   uint8_t* p_tx;
   uint8_t* p_rx;
-  delay(100);
-  for (int i=0; i<1; i++) {
-
-  }  
-  auto broadcast_handle = Motors.createWriteHandle(broadcast_id);
-  broadcast_handle.writeByte(reg_led);
-  broadcast_handle.writeByte(1);
-  broadcast_handle.startTransmission();
-  while (broadcast_handle.poll() > 0) { }
   
-  delay(500);
-  broadcast_handle.writeByte(reg_led);
-  broadcast_handle.writeByte(0);
-  broadcast_handle.startTransmission();
-  while (broadcast_handle.poll() > 0) { }
+  p_rx = DmaSPI.getRxDataPtr();
+  if (p_rx != nullptr) {
+    p_tx = DmaSPI.getTxDataPtr();
+    for(int i=0; i<8; i++) {
+      p_tx[i] = p_rx[i]; 
+    }
+    DmaSPI.queueTxData();
+  }
+  delay(250);
+  // auto broadcast_handle = Motors.createWriteHandle(broadcast_id);
+  // broadcast_handle.writeByte(reg_led);
+  // broadcast_handle.writeByte(1);
+  // broadcast_handle.startTransmission();
+  // while (broadcast_handle.poll() > 0) { }
   
-  broadcast_handle.close();
-  delay(500);
+  // delay(500);
+  // broadcast_handle.writeByte(reg_led);
+  // broadcast_handle.writeByte(0);
+  // broadcast_handle.startTransmission();
+  // while (broadcast_handle.poll() > 0) { }
+  
+  // broadcast_handle.close();
+  // delay(500);
 }
