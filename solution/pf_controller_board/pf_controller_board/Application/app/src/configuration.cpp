@@ -133,13 +133,13 @@ void initAppComponents() {
   if (pinPeripheral(MOSI, PIO_SERCOM_ALT) < 0) {
     while(1) {}
   }
-  pinMode(SS, INPUT);
+  pinMode(SS, INPUT_PULLUP);
   if (pinPeripheral(SS, PIO_SERCOM_ALT) < 0) {
     while(1) {}
   }
   
   // Initialize DMA SPI
-  DmaSPI.begin();
+  DmaSPI.begin(SERCOM_SPI_MODE_2);
   
   // Initialize DMA SERIAL
   DmaSerial0.begin(kUartBaudrate);
